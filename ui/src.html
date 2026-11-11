@@ -17,7 +17,8 @@ html.light{--bg1:#f6f5f8;--bg2:#e3e1e8;--pan:rgba(255,255,255,.72);--panb:rgba(1
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:linear-gradient(160deg,var(--bg1),var(--bg2));background-attachment:fixed;color:var(--w);font:13px/1.4 Nunito,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
-.wrap{position:absolute;left:0;top:0;width:1000px;padding:14px 16px 8px;transform-origin:0 0;display:flex;flex-direction:column}
+.stage{position:absolute;left:19px;top:19px;right:19px;bottom:19px;overflow:hidden;z-index:1}
+.wrap{width:1000px;padding:14px 16px 8px;display:flex;flex-direction:column}
 button{font:inherit;font-weight:800;color:var(--btnt);background:var(--btn);border:0;border-radius:10px;padding:0 12px;height:34px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform .14s ease,box-shadow .14s ease,background .14s ease;letter-spacing:.05em;white-space:nowrap}
 button:hover{transform:translateY(-1px) scale(1.03);background:var(--btnh);color:var(--btnt)}
 button:active{transform:none}
@@ -44,7 +45,7 @@ header{position:relative;display:flex;align-items:center;justify-content:space-b
 .lbl{font-size:9.5px;letter-spacing:.16em;color:var(--mu);font-weight:800}
 /* source */
 .srcp{width:340px;flex:none;display:flex;flex-direction:column}
-.wave{position:relative;height:150px;border-radius:12px;background:var(--cell);overflow:hidden}
+.wave{position:relative;height:178px;border-radius:12px;background:var(--cell);overflow:hidden}
 .wave canvas{position:absolute;inset:0;width:100%;height:100%}
 .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;pointer-events:none}
 .empty b{font-weight:900;font-size:13px;letter-spacing:.14em}
@@ -65,13 +66,13 @@ header{position:relative;display:flex;align-items:center;justify-content:space-b
 .seg button.on,.seg button.on:hover{background:var(--on);color:var(--ont)}
 .seg.wide button{width:66px}
 .vsep{width:1px;align-self:stretch;background:var(--panb);margin:0 2px}
-.lane{position:relative;height:150px;border-radius:12px;background:var(--cell);margin-top:12px;overflow:hidden}
-.lane canvas{position:absolute;inset:0;width:100%;height:100%}
+.lane{position:relative;height:178px;border-radius:12px;background:var(--cell);margin-top:12px;overflow:hidden}
+.lane canvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
+.lane canvas.grab{cursor:grab}.lane canvas.grabbing{cursor:grabbing}
 .bldp .row.end{margin-top:12px}
-.prev{width:150px;display:flex;align-items:center;justify-content:center;gap:8px}
-.prev svg{width:13px;height:13px}
-.prev.on,.prev.on:hover{background:var(--on)!important;color:var(--ont)!important}
-.prev.wait{animation:blink .5s ease-in-out infinite alternate}
+.tr{width:112px;display:flex;align-items:center;justify-content:center;gap:8px}
+.tr svg{width:12px;height:12px}
+.tr.on,.tr.on:hover{background:var(--on)!important;color:var(--ont)!important}
 /* knobs */
 .knp .knobs{display:flex;align-items:center;justify-content:space-around}
 .kn{display:flex;flex-direction:column;align-items:center;width:120px}
@@ -110,7 +111,7 @@ body::after{border-bottom:0}
 </style>
 </head>
 <body>
-<div class="wrap" id="wrap">
+<div class="stage" id="stage"><div class="wrap" id="wrap">
 <header>
  <div class="hl">
   <div class="val" id="bpmv" data-tip="Tempo of the build. It follows Ableton; in the standalone app drag it up and down"><small>BPM</small><span id="bpmt">124</span></div>
@@ -140,12 +141,13 @@ body::after{border-bottom:0}
   <div class="row">
    <span class="lbl">LENGTH</span><div class="seg" id="bars"></div><span class="lbl">BARS</span>
    <div class="vsep"></div>
-   <span class="lbl">ROLL</span><div class="seg wide" id="curve"></div>
+   <span class="lbl">SHAPE</span><div class="seg wide" id="shape"></div>
   </div>
-  <div class="lane" id="lane" data-tip="Each block is one hit: it gets faster and longer up to the drop. Taller blocks are pitched up"><canvas id="lcv"></canvas></div>
+  <div class="lane" id="lane" data-tip="The line is the speed of the roll: drag the points, click the line to add one, double-click a point to remove it. The blocks below are the hits"><canvas id="lcv"></canvas></div>
   <div class="row end">
-   <button class="prev" id="prev" data-tip="PREVIEW: plays the build on this track. With the song playing it comes in on the next bar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg><span>PREVIEW</span></button>
-   <span class="hint" id="phint">Then drag it to Ableton from the bar below and place it right before the drop.</span>
+   <button class="tr" id="play" data-tip="PLAY / PAUSE the build on this track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg><span>PLAY</span></button>
+   <button class="tr" id="stop" data-tip="STOP: back to the start"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span>STOP</span></button>
+   <span class="hint" id="phint">Then drag it to Ableton from the bar below.</span>
   </div>
  </div>
 </div>
@@ -153,7 +155,7 @@ body::after{border-bottom:0}
 <div class="panel knp">
  <div class="knobs" id="knobs"></div>
 </div>
-</div>
+</div></div>
 
 <div id="modal" class="modal"><div class="card">
  <h2>Settings<button class="close" id="mclose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><path d="M6 6l12 12M18 6L6 18"/></svg></button></h2>
@@ -162,8 +164,9 @@ body::after{border-bottom:0}
  <h3>HOW TO USE</h3>
  <div class="info"><b>1. Put it on the vocal track</b><br><span>The vocal goes through untouched.</span><br>
   <b>2. Get the slice</b><br><span>Drop a one-shot or a vocal slice, or press CAPTURE with the song playing: it records the next beat of the track.</span><br>
-  <b>3. Shape the build</b><br><span>LENGTH in bars, ROLL for how it speeds up (1/4 &#8594; 1/8 &#8594; 1/16 &#8594; 1/32). GATE START and END set how much of the slice plays on each hit. PITCH and FILTER rise to the drop. REVERSE turns the last hit around.</span><br>
-  <b>4. Listen and drag</b><br><span>PREVIEW plays it on the next bar. Drag the bar at the bottom into Ableton and put the clip right before the drop.</span></div>
+  <b>3. Draw the speed</b><br><span>The line sets how fast the slice repeats, from 1/2 up to 1/64. It is not locked to the grid: the roll drifts off the beat as it speeds up. Drag the points, click the line to add one, double-click to remove it. LINEAR, EXPO and LATE are starting shapes.</span><br>
+  <b>4. Shape the sound</b><br><span>LENGTH in bars. GATE START and END set how much of the slice plays on each hit. PITCH and FILTER rise to the drop. REVERSE turns the last hit around.</span><br>
+  <b>5. Listen and drag</b><br><span>PLAY / PAUSE and STOP. Drag the bar at the bottom into Ableton and put the clip right before the drop.</span></div>
  <h3>INFO</h3>
  <div class="info">MINDROLL<br><span>Series</span> Mind Series<br><span>Version</span> <b id="ver"></b><br><span>Created by</span> Dj Nan&#233;</div>
 </div></div>
@@ -172,8 +175,13 @@ body::after{border-bottom:0}
 
 <script>
 "use strict";
-const VERSION='0.1.0';
-const BARS=[1,2,4,8], CURVES=['LINEAR','EXPO','LATE'], STAGES=['1/4','1/8','1/16','1/32'];
+const VERSION='0.2.0';
+const BARS=[1,2,4,8];
+// Formas de partida de la línea (mismas que en el plugin): [x 0..1, y 0..1]. y: 0 = 1/2 ... 1 = 1/64
+const SHAPES=[['LINEAR',[[0,.2],[1,.8]],'Steady acceleration from 1/4 to 1/32'],
+ ['EXPO',[[0,.2],[.55,.36],[1,.85]],'Slow at first, faster and faster'],
+ ['LATE',[[0,.2],[.7,.24],[.9,.55],[1,.85]],'Holds 1/4 almost all the way, rolls at the very end']];
+const RATES=[[.2,'1/4'],[.4,'1/8'],[.6,'1/16'],[.8,'1/32'],[1,'1/64']];
 const J=()=>window.__JUCE__&&window.__JUCE__.backend;
 const PLUGIN=!!J();
 function emit(ev,obj){try{if(J())J().emitEvent(ev,obj||{})}catch(e){}}
@@ -184,19 +192,21 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let toastT=null;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600)}
 
 // ================= estado (el plugin manda; aquí hay una copia) =================
-const P={bars:1,curve:1,gate0:.35,gate1:1,pitch:0,filter:.5,reverse:0,sbpm:124};
+const P={bars:1,gate0:.35,gate1:1,pitch:0,filter:.5,reverse:0,sbpm:124};
+let LINE=SHAPES[1][1].map(p=>p.slice());
 let SRC={loaded:false}, PLAN={total:8,hits:[]}, settings={theme:'dark',standalone:false};
-let cap=0, prev=0, pos=0, bpm=124, dragging=null;
+let cap=0, play=0, pos=0, bpm=124, dragging=null, lineDrag=false, Z=1;
 
 function set(id,v){P[id]=v;emit('moSet',{id,v});if(!PLUGIN)demoPlan()}
 function gesture(id,begin){emit('moGesture',{id,begin})}
 function setG(id,v){gesture(id,true);set(id,v);gesture(id,false)}
+function sendLine(){emit('moLine',{pts:LINE.map(p=>[+p[0].toFixed(4),+p[1].toFixed(4)])});if(!PLUGIN)demoPlan()}
 
 // ================= deshacer =================
 const undoS=[],redoS=[];
-function snap(){return JSON.stringify(P)}
+function snap(){return JSON.stringify({P,L:LINE})}
 function pushUndo(){const s=snap();if(undoS[undoS.length-1]!==s){undoS.push(s);if(undoS.length>100)undoS.shift()}redoS.length=0}
-function restore(s){const o=JSON.parse(s);for(const k in o)if(o[k]!==P[k])setG(k,o[k]);paint()}
+function restore(s){const o=JSON.parse(s);for(const k in o.P)if(o.P[k]!==P[k])setG(k,o.P[k]);if(JSON.stringify(o.L)!==JSON.stringify(LINE)){LINE=o.L;sendLine()}paint()}
 function undo(){if(!undoS.length){toast('Nothing to undo');return}redoS.push(snap());restore(undoS.pop())}
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop())}
 $('#undo').onclick=undo;
@@ -206,7 +216,7 @@ document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLower
 function dragVal(elm,id,opt){
  let down=false,y0=0,v0=0;
  elm.addEventListener('pointerdown',e=>{if(opt.ok&&!opt.ok())return;down=true;y0=e.clientY;v0=P[id];elm.setPointerCapture(e.pointerId);pushUndo();gesture(id,true);dragging=id});
- elm.addEventListener('pointermove',e=>{if(!down)return;const d=(y0-e.clientY)/(opt.px*(e.shiftKey?4:1));const v=opt.snap(clamp(v0+d*(opt.max-opt.min),opt.min,opt.max));if(v!==P[id]){set(id,v);paint()}});
+ elm.addEventListener('pointermove',e=>{if(!down)return;const d=(y0-e.clientY)/(opt.px*Z*(e.shiftKey?4:1));const v=opt.snap(clamp(v0+d*(opt.max-opt.min),opt.min,opt.max));if(v!==P[id]){set(id,v);paint()}});
  const up=()=>{if(!down)return;down=false;dragging=null;gesture(id,false)};
  elm.addEventListener('pointerup',up);elm.addEventListener('pointercancel',up);
  elm.addEventListener('dblclick',()=>{if(opt.ok&&!opt.ok())return;pushUndo();setG(id,opt.def);paint()});
@@ -235,13 +245,14 @@ rb.onclick=()=>{pushUndo();setG('reverse',P.reverse?0:1);paint()};
 
 // ================= segmentos =================
 function seg(sel,items,get,setf){const c=$(sel);c.innerHTML='';items.forEach(([v,l,tip])=>{const b=el('button',get()===v?'on':'',l);if(tip)b.dataset.tip=tip;b.onclick=()=>setf(v);c.appendChild(b)})}
-const CTIP=['Same time on each step','Slow at first, faster and faster','Holds 1/4 almost all the way, rolls at the very end'];
+function shapeIdx(){const s=JSON.stringify(LINE.map(p=>[+p[0].toFixed(3),+p[1].toFixed(3)]));return SHAPES.findIndex(x=>JSON.stringify(x[1])===s)}
 
-// ================= vocal =================
+// ================= vocal y transporte =================
 $('#load').onclick=()=>{emit('moBrowse');if(!PLUGIN)demoSource()};
 $('#cap').onclick=()=>{emit('moCapture');if(!PLUGIN){cap=cap?0:1;paintCap()}};
-$('#prev').onclick=()=>{emit('moPreview');if(!PLUGIN){prev=prev?0:2;pos=0;paint()}};
-$('#clear').onclick=()=>{emit('moClear');if(!PLUGIN){SRC={loaded:false};paintSource()}};
+$('#play').onclick=()=>{emit('moPlay');if(!PLUGIN){play=play===1?2:1;paintPlay()}};
+$('#stop').onclick=()=>{emit('moStop');if(!PLUGIN){play=0;pos=0;paintPlay();paintLane()}};
+$('#clear').onclick=()=>{emit('moClear');if(!PLUGIN){SRC={loaded:false};paintSource();paint()}};
 const wv=$('#wave');
 ['dragenter','dragover'].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();wv.classList.add('over')}));
 ['dragleave','drop'].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();if(t==='drop'||e.target===document.documentElement)wv.classList.remove('over')}));
@@ -249,61 +260,92 @@ document.addEventListener('drop',e=>{wv.classList.remove('over');const f=e.dataT
  if(f.size>40*1024*1024){toast('That file is too big');return}
  const rd=new FileReader();rd.onload=()=>{const s=String(rd.result);emit('moLoad',{name:f.name,data:s.slice(s.indexOf(',')+1)});if(!PLUGIN)demoSource(f.name)};rd.readAsDataURL(f)});
 
-// ================= pintar =================
-function canvas(cv){const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1,s=(cv.__s||1);
- const w=Math.max(1,Math.round(r.width/s*d*s)),h=Math.max(1,Math.round(r.height/s*d*s));if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
- const c=cv.getContext('2d');c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,w,h);return {c,w,h}}
+// ================= dibujo nítido: el lienzo va a la resolución real de la pantalla =================
+function canvas(cv){const w=cv.clientWidth,h=cv.clientHeight,k=Z*(window.devicePixelRatio||1);
+ const W=Math.max(1,Math.round(w*k)),H=Math.max(1,Math.round(h*k));if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+ const c=cv.getContext('2d');c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,W,H);c.setTransform(k,0,0,k,0,0);return {c,w,h,px:1/k}}
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const snapPx=(v,px)=>Math.round(v/px)*px;
 
 function paintSource(){
  $('#empty').style.display=SRC.loaded?'none':'flex';
  const n=$('#sname');n.style.display=SRC.loaded?'inline-flex':'none';n.textContent=SRC.loaded?SRC.name:'';
  $('#clear').disabled=!SRC.loaded;
- const {c,w,h}=canvas($('#wcv'));if(!SRC.loaded||!SRC.wave)return;
- const W=SRC.wave,use=clamp(PLAN.use==null?1:PLAN.use,0,1),mid=h/2,bw=w/W.length;
- for(let i=0;i<W.length;i++){const x=i*bw,a=Math.max(1,W[i]*(h*.42));
-  c.fillStyle=css('--wave');c.globalAlpha=(i+.5)/W.length<=use?1:.28;c.fillRect(x+bw*.15,mid-a,Math.max(1,bw*.7),a*2)}
+ const {c,w,h,px}=canvas($('#wcv'));if(!SRC.loaded||!SRC.wave)return;
+ const W=SRC.wave,use=clamp(PLAN.use==null?1:PLAN.use,0,1),mid=h/2,bw=(w-16)/W.length;
+ c.fillStyle=css('--wave');
+ for(let i=0;i<W.length;i++){const x=8+i*bw,a=Math.max(px,W[i]*(h*.4));c.globalAlpha=(i+.5)/W.length<=use?1:.28;c.fillRect(snapPx(x,px),snapPx(mid-a,px),Math.max(px,snapPx(bw*.6,px)),snapPx(a*2,px))}
  c.globalAlpha=1;
- if(use<1){c.fillStyle=css('--grid2');c.fillRect(Math.round(use*w),8,Math.max(1,w/400),h-16)}
+ if(use<1){c.fillStyle=css('--grid2');c.fillRect(snapPx(8+use*(w-16),px),8,1,h-16)}
 }
+
+// geometría de la línea: área de la curva arriba, golpes en la franja de abajo
+function geo(w,h){const T=PLAN.total||4*BARS[P.bars],rv=(PLAN.hits||[]).find(x=>x[4]),end=rv?rv[0]:T;
+ const L=34,R=10,top=12,cb=h-46,hs=h-36,he=h-8,W=w-L-R;
+ return {T,end,L,R,top,cb,hs,he,W,X:b=>L+W*b/T,LX:x=>L+W*x*end/T,LY:y=>top+(cb-top)*(1-y)}}
+const hitCol=r=>r<=1.05?css('--h0'):r<=2.1?css('--h1'):r<=4.2?css('--h2'):css('--h3');
 
 function paintLane(){
- const {c,w,h}=canvas($('#lcv'));const T=PLAN.total||8,hits=PLAN.hits||[],d=window.devicePixelRatio||1;
- const top=22*d,bot=h-8*d,lh=bot-top,X=b=>8*d+(w-16*d)*b/T;
- // compases y tiempos
- for(let b=0;b<=T;b++){c.fillStyle=b%4===0?css('--grid2'):css('--grid');c.fillRect(Math.round(X(b)),top-4*d,Math.max(1,d*(b%4===0?1.5:1)),lh+4*d)}
- // tramos 1/4 · 1/8 · 1/16 · 1/32
- c.font='800 '+(9.5*d)+'px Nunito';c.textAlign='center';c.textBaseline='middle';
- for(let st=0;st<4;st++){const hs=hits.filter(x=>x[5]===st&&!x[4]);if(!hs.length)continue;
-  const a=hs[0][0],b=hs[hs.length-1][0]+hs[hs.length-1][1];c.fillStyle=css('--mu');c.fillText(STAGES[st],(X(a)+X(b))/2,11*d)}
- const rv=hits.find(x=>x[4]);if(rv){c.fillStyle=css('--mu');c.fillText('REV',(X(rv[0])+X(rv[0]+rv[1]))/2,11*d)}
+ const cv=$('#lcv'),{c,w,h,px}=canvas(cv),g=geo(w,h),hits=PLAN.hits||[];
+ c.font='800 9.5px Nunito';c.textBaseline='middle';c.textAlign='right';
+ // velocidades de referencia
+ RATES.forEach(([y,l])=>{const Y=snapPx(g.LY(y),px);c.fillStyle=css('--grid');c.fillRect(g.L,Y,g.W,px);c.fillStyle=css('--mu');c.fillText(l,g.L-6,Y)});
+ // compases
+ for(let b=0;b<=g.T;b+=4){c.fillStyle=css('--grid2');c.fillRect(snapPx(g.X(b),px),g.top,px,g.he-g.top)}
+ // zona del reverse
+ if(g.end<g.T){c.fillStyle=css('--grid');c.fillRect(g.X(g.end),g.top,g.X(g.T)-g.X(g.end),g.cb-g.top);c.fillStyle=css('--mu');c.textAlign='center';c.fillText('REV',(g.X(g.end)+g.X(g.T))/2,g.top+10)}
  // golpes
- const cols=[css('--h0'),css('--h1'),css('--h2'),css('--h3')];
- hits.forEach(([b,len,g,se,rev,st])=>{const x=X(b),ww=Math.max(1.5*d,(X(b+len*g)-x)-Math.min(2*d,(X(b+len)-x)*.18));
-  const hh=lh*(.5+.5*se/12),y=bot-hh,r=Math.min(4*d,ww/2);
-  if(rev){const gr=c.createLinearGradient(x,0,x+ww,0);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,cols[3]);c.fillStyle=gr}else c.fillStyle=cols[st];
-  c.beginPath();c.moveTo(x,bot);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.lineTo(x+ww-r,y);c.quadraticCurveTo(x+ww,y,x+ww,y+r);c.lineTo(x+ww,bot);c.closePath();c.fill()});
- if(!hits.length||!SRC.loaded){c.fillStyle=css('--mu');c.font='800 '+(11*d)+'px Nunito';c.fillText(SRC.loaded?'':'LOAD OR CAPTURE A VOCAL',w/2,top+lh/2)}
- // cabezal del preview
- if(prev===2){const x=X(pos*T);c.fillStyle=css('--w');c.fillRect(Math.round(x),top-6*d,2*d,lh+6*d)}
+ hits.forEach(([b,len,gt,se,rev,rate])=>{const x=g.X(b),full=g.X(b+len)-x,ww=Math.max(px*2,full*gt-Math.min(1.5,full*.2)),hh=(g.he-g.hs)*(.55+.45*se/12),y=g.he-hh;
+  if(rev){const gr=c.createLinearGradient(x,0,x+ww,0);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,css('--h3'));c.fillStyle=gr}else c.fillStyle=hitCol(rate);
+  const r=Math.min(3,ww/2);c.beginPath();c.moveTo(x,g.he);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.lineTo(x+ww-r,y);c.quadraticCurveTo(x+ww,y,x+ww,y+r);c.lineTo(x+ww,g.he);c.closePath();c.fill()});
+ // la línea
+ c.strokeStyle=css('--w');c.lineWidth=2;c.lineJoin='round';c.beginPath();LINE.forEach(([x,y],i)=>{const X=g.LX(x),Y=g.LY(y);i?c.lineTo(X,Y):c.moveTo(X,Y)});c.stroke();
+ LINE.forEach(([x,y],i)=>{c.beginPath();c.arc(g.LX(x),g.LY(y),i===hover?6.5:5,0,Math.PI*2);c.fillStyle=css('--h1');c.fill();c.lineWidth=2;c.strokeStyle='#000';c.stroke()});
+ if(!SRC.loaded){c.fillStyle=css('--mu');c.textAlign='center';c.font='800 11px Nunito';c.fillText('LOAD OR CAPTURE A VOCAL',g.L+g.W/2,(g.hs+g.he)/2)}
+ // cabezal
+ if(play){const x=snapPx(g.X(pos*g.T),px);c.fillStyle=css('--w');c.fillRect(x,g.top-4,2,g.he-g.top+4)}
 }
 
+// edición de la línea: arrastrar puntos, clic en la línea añade, doble clic en un punto lo quita
+let hover=-1,drag=-1;
+const lcv=$('#lcv');
+function lanePos(e){const r=lcv.getBoundingClientRect(),w=lcv.clientWidth,h=lcv.clientHeight;return [(e.clientX-r.left)/r.width*w,(e.clientY-r.top)/r.height*h,w,h]}
+function nearest(lx,ly,g){let bi=-1,bd=12;LINE.forEach(([x,y],i)=>{const d=Math.hypot(g.LX(x)-lx,g.LY(y)-ly);if(d<bd){bd=d;bi=i}});return bi}
+lcv.addEventListener('pointermove',e=>{const [lx,ly,w,h]=lanePos(e),g=geo(w,h);
+ if(drag>=0){const n=LINE.length,first=drag===0,last=drag===n-1;
+  let x=clamp((lx-g.L)/(g.W*g.end/g.T),0,1),y=clamp(1-(ly-g.top)/(g.cb-g.top),0,1);
+  if(first)x=0;else if(last)x=1;else x=clamp(x,LINE[drag-1][0]+.01,LINE[drag+1][0]-.01);
+  LINE[drag]=[x,y];sendLine();paintLane();paintShape();return}
+ const hv=nearest(lx,ly,g);if(hv!==hover){hover=hv;paintLane()}lcv.classList.toggle('grab',hv>=0)});
+lcv.addEventListener('pointerdown',e=>{const [lx,ly,w,h]=lanePos(e),g=geo(w,h);let i=nearest(lx,ly,g);
+ if(i<0){if(ly>g.cb+4||lx<g.L||lx>g.LX(1)+4||LINE.length>=12)return;   // clic en la línea: punto nuevo
+  const x=clamp((lx-g.L)/(g.W*g.end/g.T),.01,.99),y=clamp(1-(ly-g.top)/(g.cb-g.top),0,1);pushUndo();
+  LINE.push([x,y]);LINE.sort((a,b)=>a[0]-b[0]);i=LINE.findIndex(p=>p[0]===x&&p[1]===y);sendLine()}
+ else pushUndo();
+ drag=hover=i;lineDrag=true;lcv.setPointerCapture(e.pointerId);lcv.classList.add('grabbing');paintLane()});
+const lup=()=>{if(drag<0)return;drag=-1;lineDrag=false;lcv.classList.remove('grabbing');paintShape()};
+lcv.addEventListener('pointerup',lup);lcv.addEventListener('pointercancel',lup);
+lcv.addEventListener('pointerleave',()=>{if(drag<0&&hover>=0){hover=-1;paintLane()}});
+lcv.addEventListener('dblclick',e=>{const [lx,ly,w,h]=lanePos(e),i=nearest(lx,ly,geo(w,h));
+ if(i>0&&i<LINE.length-1){pushUndo();LINE.splice(i,1);hover=-1;sendLine();paintLane();paintShape()}});
+
+function paintShape(){seg('#shape',SHAPES.map((s,i)=>[i,s[0],s[2]]),shapeIdx,v=>{pushUndo();LINE=SHAPES[v][1].map(p=>p.slice());sendLine();paint()})}
 function paintCap(){const b=$('#cap');b.classList.toggle('wait',cap===1);b.classList.toggle('rec',cap===2);b.textContent=cap===1?'WAITING':cap===2?'RECORDING':'CAPTURE';
  $('#shint').textContent=cap===1?'Waiting for the next beat (or for the vocal to sound). Press again to cancel.':cap===2?'Recording one beat of the track...':'Silence at the start is trimmed automatically.'}
-function paintPrev(){const b=$('#prev');b.classList.toggle('on',prev===2);b.classList.toggle('wait',prev===1);
- b.querySelector('span').textContent=prev===1?'NEXT BAR':prev===2?'STOP':'PREVIEW';
- b.querySelector('svg').innerHTML=prev?'<rect x="6" y="6" width="12" height="12" rx="2"/>':'<path d="M7 4.5v15l12-7.5z"/>';b.disabled=!SRC.loaded}
+function paintPlay(){const b=$('#play');b.classList.toggle('on',play===1);b.querySelector('span').textContent=play===1?'PAUSE':'PLAY';
+ b.querySelector('svg').innerHTML=play===1?'<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>':'<path d="M7 4.5v15l12-7.5z"/>';
+ b.disabled=!SRC.loaded;$('#stop').disabled=!SRC.loaded||play===0}
 
 function paint(){
  seg('#bars',BARS.map((b,i)=>[i,String(b)]),()=>P.bars,v=>{pushUndo();setG('bars',v);paint()});
- seg('#curve',CURVES.map((c,i)=>[i,c,CTIP[i]]),()=>P.curve,v=>{pushUndo();setG('curve',v);paint()});
+ paintShape();
  kns.forEach(({k,dial,kv})=>{const p=(P[k.id]-k.min)/(k.max-k.min);dial.style.setProperty('--p',p);dial.style.setProperty('--a',(-135+270*p)+'deg');kv.textContent=k.fmt(P[k.id])});
  $('#rev').classList.toggle('on',!!P.reverse);
  const b=BARS[P.bars]||2,nh=(PLAN.hits||[]).length;
- $('#binfo').textContent=b+(b>1?' BARS':' BAR')+(nh?' · '+nh+' HITS':'');
+ $('#binfo').textContent=b+(b>1?' BARS':' BAR')+(nh&&SRC.loaded?' · '+nh+' HITS':'');
  const bp=settings.standalone?P.sbpm:bpm;$('#bpmt').textContent=Math.round(bp);
  $('#bpmv').classList.toggle('drag',!!settings.standalone);$('#bpmh').textContent=settings.standalone?'drag to change':'from Ableton';
- paintCap();paintPrev();paintLane();
+ paintCap();paintPlay();paintLane();
 }
 
 // ================= settings =================
@@ -315,37 +357,38 @@ $('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').classList.remove('s
 $('#ver').textContent=VERSION;
 
 (function(){const tip=$('#tip');let t=null;
- document.addEventListener('mouseover',e=>{const x=e.target.closest('[data-tip]');clearTimeout(t);tip.classList.remove('show');if(!x)return;
-  t=setTimeout(()=>{tip.textContent=x.dataset.tip;const r=x.getBoundingClientRect();tip.style.left=Math.min(innerWidth-260,Math.max(6,r.left))+'px';tip.style.top=Math.min(innerHeight-60,r.bottom+8)+'px';tip.classList.add('show')},550)});
+ document.addEventListener('mouseover',e=>{const x=e.target.closest('[data-tip]');clearTimeout(t);tip.classList.remove('show');if(!x||lineDrag)return;
+  t=setTimeout(()=>{tip.textContent=x.dataset.tip;const r=x.getBoundingClientRect();tip.style.left=Math.min(innerWidth-260,Math.max(6,r.left))+'px';tip.style.top=Math.min(innerHeight-60,r.bottom+8)+'px';tip.classList.add('show')},700)});
  document.addEventListener('pointerdown',()=>{clearTimeout(t);tip.classList.remove('show')})})();
 
-// ================= escala de la ventana =================
-function fit(){const w=$('#wrap');w.style.transform='none';w.style.width='1000px';
+// ================= escala de la ventana: zoom (no transform), así el texto se dibuja nítido =================
+function fit(){const w=$('#wrap');w.style.zoom=1;w.style.width='1000px';
  const nat=w.scrollHeight,s=Math.min((innerWidth-38)/1000,(innerHeight-38)/nat);
- w.style.width=((innerWidth-38)/s)+'px';w.style.left='19px';w.style.top='19px';w.style.transform='scale('+s+')';
- $('#wcv').__s=s;$('#lcv').__s=s;paintLane();paintSource()}
+ Z=Math.abs(s-1)<.004?1:s;w.style.zoom=Z;w.style.width=((innerWidth-38)/Z)+'px';paintLane();paintSource()}
 addEventListener('resize',fit);
+if(window.matchMedia)matchMedia('(resolution: 2dppx)').addEventListener&&matchMedia('(resolution: 2dppx)').addEventListener('change',fit);
 
 // ================= puente con el plugin =================
 on('moSettings',v=>{if(!v)return;Object.assign(settings,v);paintSettings();paint()});
 on('moState',v=>{if(!v)return;
  if(v.p){for(const k in v.p){if(k===dragging)continue;const x=v.p[k];P[k]=typeof x==='boolean'?+x:x}
-  ['bars','curve','pitch'].forEach(k=>P[k]=Math.round(P[k]));P.reverse=P.reverse>.5?1:0;paint()}
+  ['bars','pitch'].forEach(k=>P[k]=Math.round(P[k]));P.reverse=P.reverse>.5?1:0;paint()}
  let ch=false;
  if('cap' in v&&v.cap!==cap){cap=v.cap;ch=true}
- if('prev' in v&&v.prev!==prev){prev=v.prev;ch=true}
+ if('prev' in v&&v.prev!==play){play=v.prev;ch=true}
  if('bpm' in v&&v.bpm!==bpm){bpm=v.bpm;ch=true}
- if('pos' in v&&(v.pos!==pos||prev===2)){pos=v.pos;paintLane()}
+ if('pos' in v&&(v.pos!==pos||play)){pos=v.pos;if(!ch)paintLane()}
  if(ch)paint()});
 on('moSource',v=>{if(!v)return;SRC=v;paintSource();paint()});
-on('moPlan',v=>{if(!v)return;PLAN=v;paintSource();paint()});
+on('moPlan',v=>{if(!v)return;PLAN=v;if(v.line&&!lineDrag)LINE=v.line.map(p=>[+p[0],+p[1]]);paintSource();paint()});
 on('moToast',v=>{if(v&&v.msg)toast(v.msg)});
 
-// ================= modo navegador (sin plugin): plan aproximado para ver la interfaz =================
-function demoPlan(){if(PLUGIN)return;const T=4*BARS[P.bars],fr=[[.25,.25,.25,.25],[.5,.25,.125,.125],[.75,.125,.0625,.0625]][P.curve];
- const rl=P.reverse?(T>=16?1:.5):0,E=T-rl;let b=[],acc=0;fr.forEach(f=>{acc+=f*E;b.push(Math.round(acc*4)/4)});b[3]=E;
- const hs=[];let s=0;[1,.5,.25,.125].forEach((st,i)=>{for(let t=s;t<b[i]-1e-9;t+=st){const p=t/T;hs.push([t,Math.min(st,b[i]-t),P.gate0+(P.gate1-P.gate0)*p,P.pitch*p*p,0,i])}s=b[i]});
- if(rl)hs.push([E,rl,1,P.pitch,1,3]);PLAN={total:T,hits:hs,use:.6};paint()}
+// ================= modo navegador (sin plugin): mismo cálculo que el plugin para ver la interfaz =================
+function lineY(x){if(x<=LINE[0][0])return LINE[0][1];for(let i=1;i<LINE.length;i++)if(x<=LINE[i][0]){const [x0,y0]=LINE[i-1],[x1,y1]=LINE[i];return y0+(y1-y0)*(x1>x0?(x-x0)/(x1-x0):1)}return LINE[LINE.length-1][1]}
+function demoPlan(){if(PLUGIN)return;const T=4*BARS[P.bars],rl=P.reverse?(T>=16?1:.5):0,E=T-rl,hpb=y=>.5*Math.pow(32,y);
+ const st=[0];let ph=0;const dt=1/256;for(let t=0;t<E-1e-9;t+=dt){const r=hpb(lineY((t+dt/2)/E)),n=ph+r*dt;if(n>=1){const at=t+dt*(1-ph)/(r*dt);if(at<E-1e-6)st.push(at);ph=n-1}else ph=n}
+ const hs=st.map((b,i)=>{const p=b/T;return [b,(i+1<st.length?st[i+1]:E)-b,P.gate0+(P.gate1-P.gate0)*p,P.pitch*p*p,0,hpb(lineY(b/E))]});
+ if(rl)hs.push([E,rl,1,P.pitch,1,8]);PLAN={total:T,hits:hs,use:.6};paint()}
 function demoSource(n){SRC={loaded:true,name:(n||'vocal_chop').replace(/\.[^.]+$/,''),dur:.8,wave:Array.from({length:240},(_,i)=>{const t=i/240;return Math.min(1,t*40)*Math.exp(-t*2.2)*(.55+.45*Math.abs(Math.sin(i*.9)))})};paintSource();paint()}
 
 paintSettings();paint();

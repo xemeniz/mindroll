@@ -4,7 +4,6 @@
 using APVTS = juce::AudioProcessorValueTreeState;
 
 static const juce::StringArray kBars { "1", "2", "4", "8" };
-static const juce::StringArray kCurves { "Linear", "Expo", "Late" };
 
 APVTS::ParameterLayout MOProcessor::layout()
 {
@@ -12,7 +11,6 @@ APVTS::ParameterLayout MOProcessor::layout()
     using PID = juce::ParameterID;
     auto pct = juce::AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return juce::String (juce::roundToInt (v * 100)) + " %"; });
     l.add (std::make_unique<juce::AudioParameterChoice> (PID { "bars", 1 }, "Length (bars)", kBars, 1));
-    l.add (std::make_unique<juce::AudioParameterChoice> (PID { "curve", 1 }, "Roll Curve", kCurves, 1));
     l.add (std::make_unique<juce::AudioParameterFloat> (PID { "gate0", 1 }, "Gate Start", juce::NormalisableRange<float> (0.05f, 1.0f), 0.35f, pct));
     l.add (std::make_unique<juce::AudioParameterFloat> (PID { "gate1", 1 }, "Gate End", juce::NormalisableRange<float> (0.05f, 1.0f), 1.0f, pct));
     l.add (std::make_unique<juce::AudioParameterInt> (PID { "pitch", 1 }, "Pitch Up", 0, 12, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
@@ -27,11 +25,11 @@ MOProcessor::MOProcessor()
                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "MINDROLL", layout())
 {
-    pBars = apvts.getRawParameterValue ("bars");   pCurve = apvts.getRawParameterValue ("curve");
+    pBars = apvts.getRawParameterValue ("bars");
     pG0 = apvts.getRawParameterValue ("gate0");    pG1 = apvts.getRawParameterValue ("gate1");
     pPitch = apvts.getRawParameterValue ("pitch"); pFilter = apvts.getRawParameterValue ("filter");
     pRev = apvts.getRawParameterValue ("reverse"); pSbpm = apvts.getRawParameterValue ("sbpm");
-    for (auto id : { "bars", "curve", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.addParameterListener (id, this);
+    for (auto id : { "bars", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.addParameterListener (id, this);
     loadGlobal();
     startTimerHz (10);
 }
@@ -40,7 +38,7 @@ MOProcessor::~MOProcessor()
 {
     stopTimer();
     cancelPendingUpdate();
-    for (auto id : { "bars", "curve", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.removeParameterListener (id, this);
+    for (auto id : { "bars", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.removeParameterListener (id, this);
 }
 
 // ------------------------------------------------------------------ ajustes globales (tema)
@@ -91,7 +89,7 @@ void MOProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuff
     const int n = buffer.getNumSamples();
     for (int ch = getTotalNumInputChannels(); ch < getTotalNumOutputChannels(); ++ch) buffer.clear (ch, 0, n);
 
-    double bpm = pSbpm->load(), ppq = 0, barStart = -1, beatsPerBar = 4;
+    double bpm = pSbpm->load(), ppq = 0;
     bool playingHost = false, info = false;
     if (! isStandalone())
         if (auto* ph = getPlayHead())
@@ -99,8 +97,6 @@ void MOProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuff
             {
                 if (auto b = pos->getBpm()) { bpm = *b; info = true; }
                 if (auto q = pos->getPpqPosition()) ppq = *q; else info = false;
-                if (auto lb = pos->getPpqPositionOfLastBarStart()) barStart = *lb;
-                if (auto ts = pos->getTimeSignature()) beatsPerBar = ts->numerator * 4.0 / juce::jmax (1, ts->denominator);
                 playingHost = pos->getIsPlaying() && info;
             }
     hostInfo = info;
@@ -142,37 +138,22 @@ void MOProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuff
     }
     if (capState.load() == 2 && capWritten >= capTarget) { capState = 3; triggerAsyncUpdate(); }
 
-    // ---- PREVIEW: el build suena encima de la pista (con la canción en marcha, entra en el siguiente compás) ----
-    int ps = prevState.load();
-    int from = 0;
-    if (ps == 1)
+    // ---- PLAY: el build suena encima de la pista desde donde se quedó (PAUSE guarda la posición) ----
+    if (prevState.load() == 1)
     {
-        playing = active.load();
-        if (playing == nullptr) { prevState = 0; ps = 0; }
-        else if (playingHost)
-        {
-            const double bar = barStart >= 0 ? barStart : std::floor (ppq / beatsPerBar) * beatsPerBar;
-            double next = bar;
-            while (next < ppq - 1.0e-6) next += beatsPerBar;
-            const int off = (int) std::round ((next - ppq) * spb);
-            if (off < n) { from = juce::jmax (0, off); prevPos = 0; prevState = ps = 2; }
-        }
-        else { prevPos = 0; prevState = ps = 2; }
-    }
-    else if (ps == 2 && playing == nullptr) { prevState = 0; ps = 0; }
-
-    if (ps == 2 && playing != nullptr)
-    {
+        auto* now = active.load();
+        if (now == nullptr) { prevState = 0; prevPos = 0; playing = nullptr; return; }
+        playing = now;   // si se re-renderiza mientras suena, sigue con el build nuevo
         int pos = prevPos.load();
         const int len = playing->buf.getNumSamples();
-        const int m = juce::jmin (n - from, len - pos);
-        if (m > 0)
-            for (int ch = 0; ch < 2; ++ch) buffer.addFrom (ch, from, playing->buf, ch, pos, m);
-        pos += juce::jmax (0, m);
-        prevPos = pos;
-        if (pos >= len) { prevState = 0; playing = nullptr; }
+        if (pos >= len) pos = 0;
+        const int m = juce::jmin (n, len - pos);
+        for (int ch = 0; ch < 2; ++ch) buffer.addFrom (ch, 0, playing->buf, ch, pos, m);
+        pos += m;
+        if (pos >= len) { prevState = 0; prevPos = 0; playing = nullptr; }
+        else prevPos = pos;
     }
-    else if (ps == 0) playing = nullptr;
+    else playing = nullptr;
 }
 
 // ------------------------------------------------------------------ hilo de mensajes
@@ -181,7 +162,7 @@ mroll::Settings MOProcessor::settings() const
     mroll::Settings s;
     static const int bars[] { 1, 2, 4, 8 };
     s.bars = bars[juce::jlimit (0, 3, (int) pBars->load())];
-    s.curve = juce::jlimit (0, 2, (int) pCurve->load());
+    s.line = line;
     s.gateStart = pG0->load(); s.gateEnd = pG1->load();
     s.pitch = std::round (pPitch->load());
     s.filter = pFilter->load();
@@ -192,7 +173,9 @@ mroll::Settings MOProcessor::settings() const
 void MOProcessor::timerCallback()
 {
     if (build != nullptr && std::abs (build->bpm - currentBpm()) > 0.01) dirty = true;
-    if (prevState.load() == 0 && ! retired.empty()) retired.clear();
+    // los builds viejos se liberan cuando lleva parado dos vueltas del timer (el audio ya no los lee)
+    stoppedTicks = prevState.load() == 0 ? stoppedTicks + 1 : 0;
+    if (stoppedTicks >= 2 && ! retired.empty()) retired.clear();
     if (dirty.exchange (false)) rerender();
 }
 
@@ -287,30 +270,44 @@ void MOProcessor::toggleCapture()
     else capState = 0;
 }
 
-void MOProcessor::togglePreview()
+void MOProcessor::togglePlay()
 {
-    if (prevState.load() != 0) { prevState = 0; return; }
+    if (prevState.load() == 1) { prevState = 2; return; }
     if (build == nullptr) { if (onToast) onToast (source.valid() ? "Rendering, try again" : "Load or capture a vocal first"); return; }
-    prevPos = 0;
+    if (prevState.load() == 0) prevPos = 0;
     prevState = 1;
+}
+
+void MOProcessor::stopPlay() { prevState = 0; prevPos = 0; }
+
+void MOProcessor::setLine (const mroll::Line& l)
+{
+    line = mroll::sanitise (l);
+    dirty = true;
+}
+
+juce::var MOProcessor::lineVar() const
+{
+    juce::Array<juce::var> a;
+    for (auto [x, y] : line) a.add (juce::var (juce::Array<juce::var> { std::round (x * 1000.0f) / 1000.0f, std::round (y * 1000.0f) / 1000.0f }));
+    return juce::var (a);
 }
 
 float MOProcessor::previewProgress() const
 {
     auto* b = active.load();
-    if (prevState.load() != 2 || b == nullptr) return 0.0f;
+    if (prevState.load() == 0 || b == nullptr) return 0.0f;
     return (float) prevPos.load() / (float) juce::jmax (1, b->buf.getNumSamples());
 }
 
 juce::File MOProcessor::exportBuild()
 {
     if (build == nullptr) return {};
-    static const char* cn[] { "LINEAR", "EXPO", "LATE" };
     const auto s = settings();
     auto base = sourceName.isNotEmpty() ? sourceName : juce::String ("vocal");
     auto dir = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("MINDROLL").getChildFile ("Drag");
     dir.createDirectory();
-    auto f = dir.getChildFile (juce::File::createLegalFileName (base + "_ROLL_" + juce::String (s.bars) + "BAR_" + cn[s.curve] + "_"
+    auto f = dir.getChildFile (juce::File::createLegalFileName (base + "_ROLL_" + juce::String (s.bars) + "BAR_"
                                                                 + juce::String (juce::roundToInt (build->bpm)) + "BPM.wav"));
     f.deleteFile();
     juce::WavAudioFormat wav;
@@ -370,11 +367,12 @@ juce::var MOProcessor::planVar() const
     double longest = 0;
     for (auto& h : mroll::planHits (s))
     {
-        juce::Array<juce::var> a { h.beat, h.len, std::round (h.gate * 1000.0) / 1000.0, std::round (h.semis * 100.0) / 100.0, h.rev ? 1 : 0, h.stage };
+        juce::Array<juce::var> a { h.beat, h.len, std::round (h.gate * 1000.0) / 1000.0, std::round (h.semis * 100.0) / 100.0, h.rev ? 1 : 0, std::round (h.rate * 100.0) / 100.0 };
         hs.add (juce::var (a));
         longest = juce::jmax (longest, h.len * h.gate);
     }
     o->setProperty ("hits", hs);
+    o->setProperty ("line", lineVar());
     // parte del trozo que llega a sonar (el golpe más largo)
     if (source.valid()) o->setProperty ("use", juce::jmin (1.0, longest * 60.0 / currentBpm() / (source.buf.getNumSamples() / source.sr)));
     return juce::var (o);
@@ -384,6 +382,8 @@ juce::var MOProcessor::planVar() const
 void MOProcessor::getStateInformation (juce::MemoryBlock& dest)
 {
     auto st = apvts.copyState();
+    juce::StringArray pts; for (auto [x, y] : line) pts.add (juce::String (x, 4) + "," + juce::String (y, 4));
+    st.setProperty ("line", pts.joinIntoString (";"), nullptr);
     if (source.valid() && sourceBytes.getSize() > 0 && sourceBytes.getSize() < 40u * 1024u * 1024u)
     {
         st.setProperty ("sname", sourceName, nullptr);
@@ -399,7 +399,15 @@ void MOProcessor::setStateInformation (const void* d, int size)
     auto st = juce::ValueTree::fromXml (*xml);
     const auto name = st.getProperty ("sname", "").toString();
     const auto b64 = st.getProperty ("sdata", "").toString();
-    st.removeProperty ("sname", nullptr); st.removeProperty ("sdata", nullptr);
+    const auto ln = st.getProperty ("line", "").toString();
+    st.removeProperty ("sname", nullptr); st.removeProperty ("sdata", nullptr); st.removeProperty ("line", nullptr);
+    if (ln.isNotEmpty())
+    {
+        mroll::Line l;
+        for (auto& p : juce::StringArray::fromTokens (ln, ";", ""))
+            l.push_back ({ p.upToFirstOccurrenceOf (",", false, false).getFloatValue(), p.fromFirstOccurrenceOf (",", false, false).getFloatValue() });
+        line = mroll::sanitise (l);
+    }
     apvts.replaceState (st);
     if (b64.isNotEmpty())
     {

@@ -12,7 +12,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    static constexpr int kW = 1038, kWebH = 560, kBarH = 68;
+    static constexpr int kW = 1038, kWebH = 600, kBarH = 68;
 
 private:
     void timerCallback() override;

@@ -28,59 +28,60 @@ int main()
 {
     std::printf ("MINDROLL · prueba del motor\n");
 
-    // ---------- plan de golpes ----------
-    {
-        mroll::Settings s; s.bars = 1; s.curve = mroll::Linear;
-        auto h = mroll::planHits (s);
-        int count[4] {};
-        for (auto& x : h) count[x.stage]++;
-        CHECK (h.size() == 15 && count[0] == 1 && count[1] == 2 && count[2] == 4 && count[3] == 8,
-               "1 compás LINEAR debería ser 1+2+4+8 golpes (sale %d)", (int) h.size());
-    }
+    // ---------- plan de golpes (roll continuo, guiado por la línea) ----------
     const int barsList[4] { 1, 2, 4, 8 };
-    for (int curve = 0; curve < 3; ++curve)
+    const char* cn[] { "LINEAR", "EXPO", "LATE" };
+    for (int shape = 0; shape < 3; ++shape)
         for (int bars : barsList)
             for (int rev = 0; rev < 2; ++rev)
             {
-                mroll::Settings s; s.bars = bars; s.curve = curve; s.reverse = rev; s.gateStart = 0.3f; s.gateEnd = 1.0f; s.pitch = 7;
+                mroll::Settings s; s.bars = bars; s.line = mroll::shapeLine (shape); s.reverse = rev; s.gateStart = 0.3f; s.gateEnd = 1.0f; s.pitch = 7;
                 const auto h = mroll::planHits (s);
                 const double total = mroll::totalBeats (s);
-                bool grid = true, contiguous = true, accel = true, gateUp = true, pitchUp = true;
-                for (size_t i = 0; i < h.size(); ++i)
+                bool contiguous = true, accel = true, gateUp = true, pitchUp = true;
+                for (size_t i = 1; i < h.size(); ++i)
                 {
-                    const double g = h[i].beat / (h[i].rev ? 0.125 : mroll::kSteps[h[i].stage]);
-                    if (std::abs (g - std::round (g)) > 1e-9) grid = false;   // cada golpe en la rejilla de su división
-                    if (i > 0)
-                    {
-                        if (std::abs (h[i - 1].beat + h[i - 1].len - h[i].beat) > 1e-9) contiguous = false;
-                        if (! h[i].rev && h[i].stage < h[i - 1].stage) accel = false;
-                        if (! h[i].rev && h[i].gate < h[i - 1].gate - 1e-9) gateUp = false;
-                        if (h[i].semis < h[i - 1].semis - 1e-9) pitchUp = false;
-                    }
+                    if (std::abs (h[i - 1].beat + h[i - 1].len - h[i].beat) > 1e-9) contiguous = false;
+                    if (! h[i].rev && i + 1 < h.size() && ! h[i + 1].rev && h[i].len > h[i - 1].len + 1e-6) accel = false;
+                    if (! h[i].rev && h[i].gate < h[i - 1].gate - 1e-9) gateUp = false;
+                    if (h[i].semis < h[i - 1].semis - 1e-9) pitchUp = false;
                 }
                 const auto& last = h.back();
-                bool allStages = true;
-                for (int st = 0; st < 4; ++st)
-                {
-                    bool any = false; for (auto& x : h) if (x.stage == st && ! x.rev) any = true;
-                    if (! any) allStages = false;
-                }
-                const char* cn[] { "LINEAR", "EXPO", "LATE" };
-                CHECK (grid, "%s %d compases rev=%d: golpes fuera de la rejilla", cn[curve], bars, rev);
-                CHECK (contiguous, "%s %d compases rev=%d: huecos o solapes entre golpes", cn[curve], bars, rev);
-                CHECK (std::abs (last.beat + last.len - total) < 1e-9, "%s %d compases rev=%d: no termina justo en el drop", cn[curve], bars, rev);
-                CHECK (accel, "%s %d compases: la división no siempre acelera", cn[curve], bars);
-                CHECK (gateUp, "%s %d compases: el gate no crece", cn[curve], bars);
-                CHECK (pitchUp, "%s %d compases: el pitch baja en algún golpe", cn[curve], bars);
-                CHECK (allStages, "%s %d compases rev=%d: falta alguna división (1/4 a 1/32)", cn[curve], bars, rev);
-                CHECK (h.front().stage == 0 && h.front().beat == 0.0, "%s %d compases: no empieza en 1/4 en el tiempo 1", cn[curve], bars);
-                CHECK (last.rev == (bool) rev, "%s %d compases: el reverse no va en el último golpe", cn[curve], bars);
+                CHECK (h.front().beat == 0.0 && h.front().len > 0.7 && h.front().len <= 1.0, "%s %d compases: no empieza en el tiempo 1 cerca de negras (%.3f)", cn[shape], bars, h.front().len);
+                CHECK (contiguous, "%s %d compases rev=%d: huecos o solapes entre golpes", cn[shape], bars, rev);
+                CHECK (std::abs (last.beat + last.len - total) < 1e-9, "%s %d compases rev=%d: no termina justo en el drop", cn[shape], bars, rev);
+                CHECK (accel, "%s %d compases: los golpes no se aceleran siempre", cn[shape], bars);
+                CHECK (gateUp, "%s %d compases: el gate no crece", cn[shape], bars);
+                CHECK (pitchUp, "%s %d compases: el pitch baja en algún golpe", cn[shape], bars);
+                CHECK (last.rev == (bool) rev, "%s %d compases: el reverse no va en el último golpe", cn[shape], bars);
+                const auto& fast = h[h.size() - (rev ? 3 : 2)];
+                CHECK (fast.len < 0.2, "%s %d compases: al final no llega a ir rápido (%.3f negras)", cn[shape], bars, fast.len);
             }
+    // Sin rejilla: los golpes se van saliendo del tempo poco a poco.
     {
-        mroll::Settings a; a.bars = 4; a.curve = mroll::Late;
-        mroll::Settings b = a; b.curve = mroll::Linear;
-        auto firstFast = [] (const std::vector<mroll::Hit>& h) { for (auto& x : h) if (x.stage == 3) return x.beat; return 99.0; };
+        mroll::Settings s; s.bars = 2; s.line = mroll::shapeLine (mroll::Linear);
+        int off = 0, n = 0;
+        for (auto& x : mroll::planHits (s)) { ++n; const double g = x.beat * 32.0; if (std::abs (g - std::round (g)) > 0.05) ++off; }
+        CHECK (off > n / 2, "el roll sigue pegado a la rejilla (%d de %d fuera)", off, n);
+    }
+    // La línea manda: plana a 1/8 = un golpe cada media negra; hacia abajo = frena.
+    {
+        mroll::Settings s; s.bars = 1; s.line = { { 0.0f, 0.4f }, { 1.0f, 0.4f } };
+        const auto h = mroll::planHits (s);
+        CHECK (h.size() == 8 && std::abs (h[3].beat - 1.5) < 1e-3, "línea plana a 1/8: deberían ser 8 golpes en corcheas (%d)", (int) h.size());
+        s.line = { { 0.0f, 0.8f }, { 1.0f, 0.2f } };
+        const auto d = mroll::planHits (s);
+        CHECK (d.size() > 3 && d[d.size() - 2].len > d[1].len, "una línea que baja debería frenar el roll");
+    }
+    {
+        mroll::Settings a; a.bars = 4; a.line = mroll::shapeLine (mroll::Late);
+        mroll::Settings b = a; b.line = mroll::shapeLine (mroll::Linear);
+        auto firstFast = [] (const std::vector<mroll::Hit>& h) { for (auto& x : h) if (x.len < 0.13) return x.beat; return 99.0; };
         CHECK (firstFast (mroll::planHits (a)) > firstFast (mroll::planHits (b)), "LATE debería llegar a 1/32 más tarde que LINEAR");
+    }
+    {
+        const auto l = mroll::sanitise ({ { 0.7f, 2.0f }, { 0.2f, -1.0f }, { 0.4f, 0.5f } });
+        CHECK (l.size() == 3 && l.front().first == 0.0f && l.back().first == 1.0f && l.back().second == 1.0f && l.front().second == 0.0f, "la línea no se ordena ni se limita bien");
     }
 
     // ---------- trozo de vocal ----------
@@ -100,7 +101,7 @@ int main()
         for (int bars : barsList)
             for (int k = 0; k < 4; ++k)
             {
-                mroll::Settings s; s.bars = bars; s.curve = curve;
+                mroll::Settings s; s.bars = bars; s.line = mroll::shapeLine (curve);
                 s.pitch = (k & 1) ? 12.0f : 0.0f; s.filter = (k & 2) ? 1.0f : 0.0f; s.reverse = k == 3;
                 const auto out = mroll::render (src, s, bpm, SR);
                 const int N = out.getNumSamples();
@@ -117,7 +118,7 @@ int main()
     // Cada golpe suena en su sitio (sin filtro ni pitch): hay señal justo después del inicio del golpe
     // y silencio justo antes cuando el gate es corto.
     {
-        mroll::Settings s; s.bars = 2; s.curve = mroll::Linear; s.gateStart = 0.4f; s.gateEnd = 0.4f; s.filter = 0;
+        mroll::Settings s; s.bars = 2; s.line = mroll::shapeLine (mroll::Linear); s.gateStart = 0.4f; s.gateEnd = 0.4f; s.filter = 0;
         const auto out = mroll::render (src, s, bpm, SR);
         const double spb = SR * 60.0 / bpm;
         int onTime = 0, total = 0;
@@ -136,7 +137,7 @@ int main()
 
     // Reverse: el último medio tiempo sube hacia el drop (más energía al final que al principio).
     {
-        mroll::Settings s; s.bars = 1; s.curve = mroll::Expo; s.reverse = true; s.filter = 0;
+        mroll::Settings s; s.bars = 1; s.reverse = true; s.filter = 0;
         const auto out = mroll::render (src, s, bpm, SR);
         const int N = out.getNumSamples(), half = (int) (0.5 * SR * 60.0 / bpm);
         const float early = out.getRMSLevel (0, N - half, half / 3);
@@ -149,7 +150,7 @@ int main()
         juce::AudioBuffer<float> hi (1, (int) SR); 
         for (int i = 0; i < hi.getNumSamples(); ++i) hi.setSample (0, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * 2000.0 * i / SR));
         const auto hs = mroll::prepareSource (hi, SR);
-        mroll::Settings s; s.bars = 4; s.curve = mroll::Linear; s.filter = 1.0f; s.gateStart = s.gateEnd = 1.0f;
+        mroll::Settings s; s.bars = 4; s.line = mroll::shapeLine (mroll::Linear); s.filter = 1.0f; s.gateStart = s.gateEnd = 1.0f;
         mroll::Settings d = s; d.filter = 0.0f;
         const auto f = mroll::render (hs, s, bpm, SR), o = mroll::render (hs, d, bpm, SR);
         const int beat = (int) (SR * 60.0 / bpm), N = f.getNumSamples();

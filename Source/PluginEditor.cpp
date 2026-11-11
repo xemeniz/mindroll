@@ -48,7 +48,16 @@ MOEditor::MOEditor (MOProcessor& p)
         })
         .withEventListener ("moClear", [this] (const juce::var&) { proc.clearSource(); })
         .withEventListener ("moCapture", [this] (const juce::var&) { proc.toggleCapture(); })
-        .withEventListener ("moPreview", [this] (const juce::var&) { proc.togglePreview(); })
+        .withEventListener ("moPlay", [this] (const juce::var&) { proc.togglePlay(); })
+        .withEventListener ("moStop", [this] (const juce::var&) { proc.stopPlay(); })
+        .withEventListener ("moLine", [this] (const juce::var& v)
+        {
+            mroll::Line l;
+            if (auto* a = v.getProperty ("pts", juce::var()).getArray())
+                for (auto& pt : *a)
+                    if (pt.isArray() && pt.size() >= 2) l.push_back ({ (float) (double) pt[0], (float) (double) pt[1] });
+            proc.setLine (l);
+        })
         .withEventListener ("moSettings", [this] (const juce::var& v)
         {
             if (v.hasProperty ("theme")) proc.lightTheme = v.getProperty ("theme", "dark").toString() == "light";
@@ -100,6 +109,7 @@ void MOEditor::loadFile (const juce::File& f)
 void MOEditor::paint (juce::Graphics& g)
 {
     // El marco moteado sigue por detrás de la barra de arrastre, con su línea negra por fuera.
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
     if (frame.isValid()) g.drawImage (frame, getLocalBounds().toFloat(), juce::RectanglePlacement::fillDestination);
     else g.fillAll (juce::Colour (0xff0b0a0e));
     g.setColour (juce::Colours::black);

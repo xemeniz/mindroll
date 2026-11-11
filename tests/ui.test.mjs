@@ -6,7 +6,7 @@ const out = process.argv[3] || '/tmp/mo';
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('  FALLO: ' + m); } else console.log('  ok: ' + m); };
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1038, height: 560 } });   // la parte web del plugin (la barra de arrastre es nativa)
+const page = await browser.newPage({ viewport: { width: 1038, height: 600 }, deviceScaleFactor: 2 });   // la parte web del plugin en un Mac Retina (la barra de arrastre es nativa)
 const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await page.addInitScript(() => {
   window.__sent = []; window.__ls = {};
@@ -24,32 +24,39 @@ await fire('moSettings', { theme: 'dark', standalone: false });
 
 // sin vocal
 ok(await page.isVisible('#empty'), 'sin vocal enseña "DROP A VOCAL HERE"');
-ok(await page.isDisabled('#prev'), 'PREVIEW apagado sin vocal');
+ok(await page.isDisabled('#play') && await page.isDisabled('#stop'), 'PLAY y STOP apagados sin vocal');
 ok(await page.isDisabled('#clear'), 'CLEAR apagado sin vocal');
 
 // estado y plan desde el plugin (plan real de 2 compases EXPO)
-const params = { bars: 1, curve: 1, gate0: 0.35, gate1: 1, pitch: 5, filter: 0.5, reverse: false, sbpm: 124 };
+const params = { bars: 1, gate0: 0.35, gate1: 1, pitch: 5, filter: 0.5, reverse: false, sbpm: 124 };
 await fire('moState', { p: params, cap: 0, prev: 0, pos: 0, bpm: 126 });
-const hits = []; let t = 0;
-[[0, 1, 4], [1, 0.5, 4], [2, 0.25, 4], [3, 0.125, 8]].forEach(([st, step, n]) => { for (let i = 0; i < n; i++) { hits.push([t, step, 0.35 + 0.65 * t / 8, 5 * (t / 8) ** 2, 0, st]); t += step; } });
-await fire('moPlan', { total: 8, bpm: 126, hits, use: 0.62 });
+const line = [[0, 0.2], [0.55, 0.36], [1, 0.85]];
+const hits = []; { let t = 0; while (t < 8) { const r = 0.5 * Math.pow(32, 0.2 + 0.65 * t / 8); const len = Math.min(1 / r, 8 - t); hits.push([t, len, 0.35 + 0.65 * t / 8, 5 * (t / 8) ** 2, 0, r]); t += len; } }
+await fire('moPlan', { total: 8, bpm: 126, hits, use: 0.62, line });
 const wave = Array.from({ length: 240 }, (_, i) => Math.min(1, i / 8) * Math.exp(-i / 120));
 await fire('moSource', { loaded: true, name: 'hey_chop', dur: 0.8, wave });
 ok(await page.isHidden('#empty'), 'con vocal se quita el aviso');
 ok((await page.textContent('#sname')) === 'hey_chop', 'enseña el nombre del trozo');
 ok((await page.textContent('#bpmt')) === '126', 'BPM del host');
-ok((await page.textContent('#binfo')) === '2 BARS · 20 HITS', 'resumen del build (' + await page.textContent('#binfo') + ')');
+ok((await page.textContent('#binfo')) === '2 BARS · ' + hits.length + ' HITS', 'resumen del build (' + await page.textContent('#binfo') + ')');
 ok((await page.locator('#bars button.on').textContent()) === '2', 'LENGTH marca 2 compases');
-ok((await page.locator('#curve button.on').textContent()) === 'EXPO', 'ROLL marca EXPO');
+ok((await page.locator('#shape button.on').textContent()) === 'EXPO', 'SHAPE reconoce la forma EXPO de la línea');
 ok((await page.locator('.kv').nth(2).textContent()) === '+5 st', 'knob PITCH enseña +5 st');
-ok(!(await page.isDisabled('#prev')), 'PREVIEW activo con vocal');
+ok(!(await page.isDisabled('#play')), 'PLAY activo con vocal');
+ok(await page.isDisabled('#stop'), 'STOP apagado mientras no suena');
 const lanePix = await page.evaluate(() => { const c = document.querySelector('#lcv'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; });
-ok(lanePix > 2000, 'dibuja los golpes en la línea del build');
+ok(lanePix > 2000, 'dibuja los golpes y la línea');
+
+// nitidez: sin escalado a tamaño normal y lienzos a la resolución de la pantalla (Retina = 2x)
+const crisp = await page.evaluate(() => { const w = document.querySelector('#wrap'), c = document.querySelector('#lcv');
+  return { zoom: getComputedStyle(w).zoom, tf: getComputedStyle(w).transform, cw: c.width, ccw: c.clientWidth, dpr: devicePixelRatio }; });
+ok(crisp.zoom === '1' && crisp.tf === 'none', 'a tamaño normal la interfaz no se escala (zoom ' + crisp.zoom + ', transform ' + crisp.tf + ')');
+ok(crisp.cw === Math.round(crisp.ccw * crisp.dpr), 'la línea se dibuja a resolución Retina (' + crisp.cw + ' px para ' + crisp.ccw + ' px)');
 await page.screenshot({ path: out + '-dark.png' });
 
 // todos los botones de una fila con el mismo tamaño
 const sizes = async sel => page.$$eval(sel, els => els.map(e => Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)));
-for (const sel of ['.btns3 button', '#bars button', '#curve button']) { const s = await sizes(sel); ok(new Set(s).size === 1, 'mismo tamaño en ' + sel + ' (' + s.join(', ') + ')'); }
+for (const sel of ['.btns3 button', '#bars button', '#shape button', '.row.end button.tr']) { const s = await sizes(sel); ok(new Set(s).size === 1, 'mismo tamaño en ' + sel + ' (' + s.join(', ') + ')'); }
 
 // LENGTH y ROLL mandan el parámetro con su gesto
 await clear();
@@ -57,9 +64,37 @@ await page.click('#bars button:nth-child(4)');
 let s = await sent();
 ok(s.some(([e, o]) => e === 'moSet' && o.id === 'bars' && o.v === 3), 'LENGTH 8 manda bars=3');
 ok(s.some(([e, o]) => e === 'moGesture' && o.id === 'bars' && o.begin), 'LENGTH abre el gesto (automatización)');
+// SHAPE: LATE manda su línea
 await clear();
-await page.click('#curve button:nth-child(3)');
-ok((await sent()).some(([e, o]) => e === 'moSet' && o.id === 'curve' && o.v === 2), 'ROLL LATE manda curve=2');
+await page.click('#shape button:nth-child(3)');
+let ln = (await sent()).filter(([e]) => e === 'moLine').pop();
+ok(ln && ln[1].pts.length === 4 && ln[1].pts[3][1] === 0.85, 'SHAPE LATE manda su línea al plugin');
+
+// la línea: arrastrar un punto, clic para añadir, doble clic para quitar
+const lb = await page.locator('#lcv').boundingBox();
+const geoPt = await page.evaluate(() => { const c = document.querySelector('#lcv'), r = c.getBoundingClientRect(), w = c.clientWidth, h = c.clientHeight;
+  // mismo cálculo que geo(): L=34, R=10, top=12, cb=h-46
+  const L = 34, W = w - 44, top = 12, cb = h - 46, sx = r.width / w, sy = r.height / h;
+  return { x: (x) => 0, L, W, top, cb, sx, sy, left: r.left, topPx: r.top }; });
+const toPx = (x, y) => [geoPt.left + (geoPt.L + geoPt.W * x) * geoPt.sx, geoPt.topPx + (geoPt.top + (geoPt.cb - geoPt.top) * (1 - y)) * geoPt.sy];
+await clear();
+let [px, py] = toPx(0.7, 0.24);
+await page.mouse.move(px, py); await page.mouse.down(); await page.mouse.move(px, py - 40, { steps: 5 }); await page.mouse.up();
+ln = (await sent()).filter(([e]) => e === 'moLine').pop();
+ok(ln && ln[1].pts.length === 4 && ln[1].pts[1][1] > 0.4, 'arrastrar un punto hacia arriba acelera esa parte (' + (ln && JSON.stringify(ln[1].pts[1])) + ')');
+await clear();
+[px, py] = toPx(0.3, 0.215);
+await page.mouse.click(px, py);
+ln = (await sent()).filter(([e]) => e === 'moLine').pop();
+ok(ln && ln[1].pts.length === 5, 'clic en la línea añade un punto');
+await clear();
+await page.mouse.dblclick(px, py);
+ln = (await sent()).filter(([e]) => e === 'moLine').pop();
+ok(ln && ln[1].pts.length === 4, 'doble clic en un punto lo quita');
+ok((await page.locator('#shape button.on').count()) === 0, 'con la línea editada no se marca ninguna forma');
+await clear();
+await page.keyboard.press('Control+z');
+ok((await sent()).some(([e, o]) => e === 'moLine'), 'Cmd+Z deshace los cambios de la línea');
 
 // knob GATE START: arrastrar hacia arriba
 await clear();
@@ -89,17 +124,21 @@ await clear();
 await page.keyboard.press('Control+z');
 ok((await sent()).some(([e, o]) => e === 'moSet' && o.id === 'reverse' && o.v === 0), 'Cmd+Z deshace REVERSE');
 
-// botones del trozo
+// botones del trozo y transporte
 await clear();
-await page.click('#cap'); await page.click('#prev'); await page.click('#load'); await page.click('#clear');
+await page.click('#cap'); await page.click('#play'); await page.click('#load'); await page.click('#clear');
 s = (await sent()).map(([e]) => e);
-ok(['moCapture', 'moPreview', 'moBrowse', 'moClear'].every(e => s.includes(e)), 'CAPTURE, PREVIEW, LOAD y CLEAR avisan al plugin (' + s.join(',') + ')');
-await fire('moState', { cap: 1, prev: 2, pos: 0.5 });
+ok(['moCapture', 'moPlay', 'moBrowse', 'moClear'].every(e => s.includes(e)), 'CAPTURE, PLAY, LOAD y CLEAR avisan al plugin (' + s.join(',') + ')');
+await fire('moState', { cap: 1, prev: 1, pos: 0.5 });
 ok((await page.textContent('#cap')) === 'WAITING', 'CAPTURE enseña WAITING mientras espera el tiempo');
-ok((await page.textContent('#prev span')) === 'STOP', 'PREVIEW pasa a STOP mientras suena');
-await fire('moState', { cap: 2, prev: 1 });
+ok((await page.textContent('#play span')) === 'PAUSE', 'PLAY pasa a PAUSE mientras suena');
+ok(!(await page.isDisabled('#stop')), 'STOP activo mientras suena');
+await page.screenshot({ path: out + '-playing.png' });
+await clear(); await page.click('#stop');
+ok((await sent()).some(([e]) => e === 'moStop'), 'STOP avisa al plugin');
+await fire('moState', { cap: 2, prev: 2 });
 ok((await page.textContent('#cap')) === 'RECORDING', 'CAPTURE enseña RECORDING');
-ok((await page.textContent('#prev span')) === 'NEXT BAR', 'PREVIEW espera al siguiente compás');
+ok((await page.textContent('#play span')) === 'PLAY' && !(await page.isDisabled('#stop')), 'en pausa: PLAY para seguir y STOP activo');
 await fire('moState', { cap: 0, prev: 0 });
 
 // soltar un archivo encima
@@ -125,7 +164,7 @@ await fire('moSettings', { standalone: false });
 // settings y tema claro
 await page.click('#gear');
 ok(await page.isVisible('#modal.show'), 'Settings se abre');
-ok((await page.textContent('#ver')) === '0.1.0', 'Settings enseña la versión');
+ok((await page.textContent('#ver')) === '0.2.0', 'Settings enseña la versión');
 await clear();
 await page.click('#theme button:nth-child(2)');
 ok((await sent()).some(([e, o]) => e === 'moSettings' && o.theme === 'light'), 'el tema claro se guarda en el plugin');
@@ -149,8 +188,10 @@ ok(noEmoji, 'sin emojis');
 ok(errors.length === 0, 'sin errores de JavaScript (' + errors.join(' | ') + ')');
 
 // también se ve bien más pequeña
-await page.setViewportSize({ width: 800, height: 432 });
+await page.setViewportSize({ width: 800, height: 462 });
 await page.waitForTimeout(150);
+const small = await page.evaluate(() => { const c = document.querySelector('#lcv'); return { zoom: +getComputedStyle(document.querySelector('#wrap')).zoom, cw: c.width, ccw: c.clientWidth, dpr: devicePixelRatio }; });
+ok(small.zoom < 1 && Math.abs(small.cw - Math.round(small.ccw * small.zoom * small.dpr)) <= 1, 'más pequeña usa zoom y los lienzos siguen a resolución real');
 await page.screenshot({ path: out + '-small.png' });
 
 await browser.close();

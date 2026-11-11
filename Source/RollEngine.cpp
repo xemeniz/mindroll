@@ -9,62 +9,89 @@ double totalBeats (const Settings& s)
     return 4.0 * b;
 }
 
-static double q (double v, double grid) { return std::round (v / grid) * grid; }
+Line shapeLine (int shape)
+{
+    switch (shape)
+    {
+        case Linear: return { { 0.0f, 0.2f }, { 1.0f, 0.8f } };
+        case Late:   return { { 0.0f, 0.2f }, { 0.7f, 0.24f }, { 0.9f, 0.55f }, { 1.0f, 0.85f } };
+        default:     return { { 0.0f, 0.2f }, { 0.55f, 0.36f }, { 1.0f, 0.85f } };
+    }
+}
+
+double hitsPerBeat (double y) { return 0.5 * std::pow (32.0, juce::jlimit (0.0, 1.0, y)); }
+
+Line sanitise (const Line& in)
+{
+    Line l;
+    for (auto [x, y] : in)
+        if (std::isfinite (x) && std::isfinite (y)) l.push_back ({ juce::jlimit (0.0f, 1.0f, x), juce::jlimit (0.0f, 1.0f, y) });
+    if (l.size() < 2) return shapeLine (Expo);
+    std::stable_sort (l.begin(), l.end(), [] (auto& a, auto& b) { return a.first < b.first; });
+    if (l.size() > 12) l.resize (12);
+    l.front().first = 0.0f; l.back().first = 1.0f;
+    return l;
+}
+
+double lineY (const Line& l, double x)
+{
+    if (l.empty()) return 0.5;
+    if (x <= l.front().first) return l.front().second;
+    for (size_t i = 1; i < l.size(); ++i)
+        if (x <= l[i].first)
+        {
+            const double x0 = l[i - 1].first, x1 = l[i].first;
+            const double f = x1 > x0 ? (x - x0) / (x1 - x0) : 1.0;
+            return l[i - 1].second + (l[i].second - l[i - 1].second) * f;
+        }
+    return l.back().second;
+}
 
 std::vector<Hit> planHits (const Settings& s)
 {
     const double total = totalBeats (s);
-
-    // Parte del build que se queda cada división. LATE aguanta 1/4 casi todo y acelera al final.
-    static const double fr[3][4] { { 0.25, 0.25, 0.25, 0.25 },
-                                   { 0.50, 0.25, 0.125, 0.125 },
-                                   { 0.75, 0.125, 0.0625, 0.0625 } };
-    const int c = juce::jlimit (0, 2, s.curve);
-
     // Con REVERSE, el último medio tiempo (1 tiempo en builds de 4 y 8 compases) es el golpe al revés
     // y el roll se reparte en lo que queda.
     const double revLen = s.reverse ? (total >= 16.0 ? 1.0 : 0.5) : 0.0;
     const double end = total - revLen;
-
-    // Límites de cada tramo: cada uno empieza en su propia rejilla (1/8 en corchea, 1/16 en semicorchea...)
-    // y deja sitio para al menos un golpe de cada división que viene detrás.
-    static const double grid[3] { 1.0, 0.5, 0.25 }, minAfter[3] { 0.875, 0.375, 0.125 };
-    double b[4]; double acc = 0;
-    for (int i = 0; i < 3; ++i)
-    {
-        acc += fr[c][i] * end;
-        const double g = grid[i];
-        const double lo = i == 0 ? 1.0 : b[i - 1] + kSteps[i];
-        const double hi = std::floor ((end - minAfter[i]) / g + 1.0e-9) * g;
-        b[i] = juce::jlimit (lo, std::max (lo, hi), q (acc, g));
-    }
-    b[3] = end;
-
+    const Line line = sanitise (s.line.empty() ? shapeLine (Expo) : s.line);
     const double g0 = juce::jlimit (0.05, 1.0, (double) s.gateStart);
     const double g1 = juce::jlimit (0.05, 1.0, (double) s.gateEnd);
     const double pitch = juce::jlimit (0.0, 12.0, (double) s.pitch);
 
-    std::vector<Hit> hits;
-    double start = 0;
-    for (int st = 0; st < 4; ++st)
+    // Golpes: se integra la velocidad de la línea. Sin rejilla: cada golpe cae donde lo lleva la aceleración.
+    std::vector<double> starts { 0.0 };
+    const double dt = 1.0 / 512.0;
+    double phase = 0.0;
+    for (double t = 0.0; t < end - 1.0e-9; t += dt)
     {
-        const double step = kSteps[st];
-        for (double t = start; t < b[st] - 1.0e-9 && t < end - 1.0e-9; t += step)
+        const double step = std::min (dt, end - t);
+        const double r = hitsPerBeat (lineY (line, (t + step * 0.5) / end));
+        const double next = phase + r * step;
+        if (next >= 1.0)
         {
-            Hit h;
-            h.beat = t;
-            h.len = std::min ({ step, b[st] - t, end - t });
-            const double p = t / total;
-            h.gate = g0 + (g1 - g0) * p;
-            h.semis = pitch * p * p;     // el pitch sube sobre todo al final
-            h.stage = st;
-            hits.push_back (h);
+            const double at = t + step * (1.0 - phase) / (r * step);
+            if (at < end - 1.0e-6) starts.push_back (at);
+            phase = next - 1.0;
         }
-        start = b[st];
+        else phase = next;
+    }
+
+    std::vector<Hit> hits;
+    for (size_t i = 0; i < starts.size(); ++i)
+    {
+        Hit h;
+        h.beat = starts[i];
+        h.len = (i + 1 < starts.size() ? starts[i + 1] : end) - h.beat;
+        const double p = h.beat / total;
+        h.gate = g0 + (g1 - g0) * p;
+        h.semis = pitch * p * p;     // el pitch sube sobre todo al final
+        h.rate = hitsPerBeat (lineY (line, h.beat / end));
+        hits.push_back (h);
     }
     if (revLen > 0)
     {
-        Hit h; h.beat = end; h.len = revLen; h.gate = 1.0; h.semis = pitch; h.rev = true; h.stage = 3;
+        Hit h; h.beat = end; h.len = revLen; h.gate = 1.0; h.semis = pitch; h.rev = true; h.rate = hits.empty() ? 8.0 : hits.back().rate;
         hits.push_back (h);
     }
     return hits;

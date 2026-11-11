@@ -2,16 +2,24 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <vector>
 
-// Motor de MINDROLL: coge un trozo de vocal y lo repite cada vez más rápido (1/4 → 1/8 → 1/16 → 1/32)
-// hasta el drop. Todo se calcula offline: el plugin renderiza el build entero y lo reproduce o lo exporta.
+// Motor de MINDROLL: coge un trozo de vocal y lo repite cada vez más rápido hasta el drop.
+// La velocidad sigue una línea continua, sin rejilla: el roll se va saliendo del tempo poco a poco. Todo se calcula offline: el plugin renderiza el build entero y lo reproduce o lo exporta.
 namespace mroll
 {
-    enum Curve { Linear = 0, Expo = 1, Late = 2 };
+    enum Shape { Linear = 0, Expo = 1, Late = 2 };
+
+    // La línea de velocidad: puntos (x = 0..1 del roll, y = 0..1 de velocidad).
+    // y = 0 → 1/2, 0.2 → 1/4, 0.4 → 1/8, 0.6 → 1/16, 0.8 → 1/32, 1 → 1/64 (escala logarítmica).
+    using Line = std::vector<std::pair<float, float>>;
+    Line shapeLine (int shape);                 // formas de partida LINEAR / EXPO / LATE
+    double hitsPerBeat (double y);              // velocidad en golpes por negra
+    double lineY (const Line&, double x);       // valor de la línea en x (tramos rectos)
+    Line sanitise (const Line&);                // ordena, limita y fija el primer y último punto
 
     struct Settings
     {
         int bars = 2;            // 1, 2, 4 u 8 compases (4/4)
-        int curve = Expo;        // cómo se reparte el tiempo entre 1/4, 1/8, 1/16 y 1/32
+        Line line;               // velocidad del roll a lo largo del build (vacía = EXPO)
         float gateStart = 0.35f; // trozo que suena en cada golpe al principio (0-1 del paso)
         float gateEnd = 1.0f;    // ... y al final, justo antes del drop
         float pitch = 0.0f;      // semitonos que sube al final (0-12)
@@ -26,10 +34,8 @@ namespace mroll
         double gate = 1;    // parte del paso que suena (0-1)
         double semis = 0;   // pitch de este golpe
         bool rev = false;
-        int stage = 0;      // 0 = 1/4, 1 = 1/8, 2 = 1/16, 3 = 1/32
+        double rate = 1;    // golpes por negra en ese momento (1 = 1/4, 8 = 1/32)
     };
-
-    constexpr double kSteps[4] { 1.0, 0.5, 0.25, 0.125 };
 
     // El trozo de vocal ya preparado (silencio inicial recortado, estéreo).
     struct Source

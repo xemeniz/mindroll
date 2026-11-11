@@ -47,7 +47,10 @@ public:
     juce::String loadBytes (const juce::MemoryBlock&, const juce::String& name);   // "" si va bien
     void clearSource();
     void toggleCapture();
-    void togglePreview();
+    void togglePlay();                   // PLAY / PAUSE
+    void stopPlay();                     // STOP: para y vuelve al principio
+    void setLine (const mroll::Line&);   // la línea de velocidad (desde la interfaz)
+    juce::var lineVar() const;
     juce::File exportBuild();            // WAV del build para arrastrar a Ableton
     bool hasSource() const { return source.valid(); }
     bool hasBuild() const { return build != nullptr; }
@@ -55,7 +58,7 @@ public:
     double currentBpm() const;
 
     int captureState() const { return capState.load(); }      // 0 nada, 1 esperando, 2 grabando
-    int previewState() const { return prevState.load(); }     // 0 parado, 1 esperando el compás, 2 sonando
+    int previewState() const { return prevState.load(); }     // 0 parado, 1 sonando, 2 en pausa
     float previewProgress() const;
 
     std::function<void()> onSourceChanged, onPlanChanged;
@@ -81,12 +84,14 @@ private:
     bool setSourceFromBuffer (const juce::AudioBuffer<float>&, double sr, const juce::String& name);
 
     mroll::Source source;
+    mroll::Line line = mroll::shapeLine (mroll::Expo);   // solo hilo de mensajes
     juce::String sourceName;
     juce::MemoryBlock sourceBytes;       // el archivo original (o la captura en WAV) para guardarlo con el proyecto
     std::vector<float> wave;
 
     Build::Ptr build;                    // el build actual (solo hilo de mensajes)
     std::vector<Build::Ptr> retired;     // builds viejos que el audio aún puede estar leyendo
+    int stoppedTicks = 0;
     std::atomic<Build*> active { nullptr };   // lo que reproduce PREVIEW
     juce::SpinLock buildLock;
 
@@ -106,7 +111,7 @@ private:
     std::atomic<int> prevPos { 0 };
     Build* playing = nullptr;
 
-    std::atomic<float>* pBars = nullptr; std::atomic<float>* pCurve = nullptr;
+    std::atomic<float>* pBars = nullptr;
     std::atomic<float>* pG0 = nullptr; std::atomic<float>* pG1 = nullptr;
     std::atomic<float>* pPitch = nullptr; std::atomic<float>* pFilter = nullptr;
     std::atomic<float>* pRev = nullptr; std::atomic<float>* pSbpm = nullptr;

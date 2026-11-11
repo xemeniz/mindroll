@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wfloat-equal"
 // Prueba del procesador de MINDROLL (sin interfaz): carga, PREVIEW por processBlock, CAPTURE y guardar/abrir proyecto.
 #include "../Source/PluginProcessor.h"
 #include <cstdio>
@@ -58,8 +59,8 @@ int main()
         CHECK (b.getSample (0, 100) == 0.25f && b.getSample (1, 100) == -0.25f, "la pista no pasa limpia sin PREVIEW");
     }
 
-    // PREVIEW (sin host: arranca ya) suena y se para solo al terminar el build (2 compases a 124 = 3,87 s)
-    p->togglePreview();
+    // PLAY arranca ya, suena y se para solo al terminar el build (2 compases a 124 = 3,87 s)
+    p->togglePlay();
     float peak = 0; int blocks = 0, sounding = 0;
     for (; blocks < 1000; ++blocks)
     {
@@ -74,6 +75,28 @@ int main()
     CHECK (std::abs (secs - 8 * 60.0 / 124.0) < 0.05, "PREVIEW no dura el build (%.2f s)", secs);
     CHECK (peak <= 0.4f + 1e-3f, "PREVIEW más fuerte que la vocal (%.3f)", peak);
 
+    // PAUSE guarda la posición y PLAY sigue desde ahí; STOP vuelve al principio
+    {
+        juce::AudioBuffer<float> b (2, BS);
+        p->togglePlay();
+        for (int k = 0; k < 40; ++k) { b.clear(); p->processBlock (b, midi); }
+        const float at = p->previewProgress();
+        p->togglePlay();   // pausa
+        CHECK (p->previewState() == 2, "PAUSE no pausa");
+        for (int k = 0; k < 20; ++k) { b.clear(); p->processBlock (b, midi); }
+        CHECK (std::abs (p->previewProgress() - at) < 1e-6f && b.getMagnitude (0, 0, BS) == 0.0f, "en pausa sigue avanzando o sonando");
+        p->togglePlay();
+        for (int k = 0; k < 5; ++k) { b.clear(); p->processBlock (b, midi); }
+        CHECK (p->previewProgress() > at, "PLAY no sigue desde la pausa");
+        p->stopPlay();
+        b.clear(); p->processBlock (b, midi);
+        CHECK (p->previewState() == 0 && p->previewProgress() == 0.0f && b.getMagnitude (0, 0, BS) == 0.0f, "STOP no para ni vuelve al principio");
+    }
+
+    // la línea se guarda con el proyecto
+    p->setLine ({ { 0.0f, 0.3f }, { 0.5f, 0.3f }, { 1.0f, 0.9f } });
+    pump (300);
+
     // cambiar LENGTH re-renderiza (el timer del procesador)
     p->setParam ("bars", 3);
     pump (400);
@@ -82,7 +105,7 @@ int main()
         juce::AudioFormatManager fm; fm.registerBasicFormats();
         std::unique_ptr<juce::AudioFormatReader> r (fm.createReaderFor (f));
         CHECK (r != nullptr && std::abs (r->lengthInSamples / SR - 32 * 60.0 / 124.0) < 0.01, "el WAV exportado no son 8 compases");
-        CHECK (f.getFileName() == "hey_chop_ROLL_8BAR_EXPO_124BPM.wav", "nombre del WAV: %s", f.getFileName().toRawUTF8());
+        CHECK (f.getFileName() == "hey_chop_ROLL_8BAR_124BPM.wav", "nombre del WAV: %s", f.getFileName().toRawUTF8());
     }
 
     // guardar y abrir el proyecto: vuelve la vocal y los ajustes
@@ -93,6 +116,7 @@ int main()
         pump (300);
         CHECK (q->hasSource() && q->hasBuild(), "al abrir el proyecto no vuelve la vocal");
         CHECK ((int) q->apvts.getRawParameterValue ("bars")->load() == 3, "al abrir el proyecto no vuelve LENGTH");
+        CHECK (q->lineVar().size() == 3 && std::abs ((double) q->lineVar()[2][1] - 0.9) < 1e-3, "al abrir el proyecto no vuelve la línea");
     }
 
     // CAPTURE (sin host: empieza cuando suena la vocal) graba 1,25 tiempos de la pista

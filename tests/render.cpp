@@ -14,7 +14,7 @@ int main (int argc, char** argv)
     juce::AudioBuffer<float> in ((int) r->numChannels, (int) r->lengthInSamples);
     r->read (&in, 0, (int) r->lengthInSamples, 0, true, true);
     mroll::Settings s;
-    s.bars = (int) arg (3, 2); s.curve = (int) arg (4, 1); s.pitch = (float) arg (5, 0); s.filter = (float) arg (6, 0.5);
+    s.bars = (int) arg (3, 2); s.line = mroll::shapeLine ((int) arg (4, 1)); s.pitch = (float) arg (5, 0); s.filter = (float) arg (6, 0.5);
     s.reverse = arg (7, 0) > 0.5; s.gateStart = (float) arg (9, 0.35); s.gateEnd = (float) arg (10, 1.0);
     const double sr = 48000.0;
     auto out = mroll::render (mroll::prepareSource (in, r->sampleRate), s, arg (8, 124), sr);
