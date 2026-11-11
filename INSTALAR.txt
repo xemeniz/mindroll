@@ -1,0 +1,16 @@
+MINDROLL · Dj Nané — instalar en Mac (Apple Silicon)
+
+1) Abre la app Terminal (Cmd + Espacio, escribe "Terminal", Enter).
+2) Pega este bloque entero y pulsa Enter (si estás en la carpeta Descargas):
+
+cd ~/Downloads/MINDROLL && mkdir -p ~/Library/Audio/Plug-Ins/VST3 ~/Library/Audio/Plug-Ins/Components && rm -rf ~/Library/Audio/Plug-Ins/VST3/MINDROLL.vst3 ~/Library/Audio/Plug-Ins/Components/MINDROLL.component /Applications/MINDROLL.app && cp -R MINDROLL.vst3 ~/Library/Audio/Plug-Ins/VST3/ && cp -R MINDROLL.component ~/Library/Audio/Plug-Ins/Components/ && cp -R MINDROLL.app /Applications/ && xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/MINDROLL.vst3 ~/Library/Audio/Plug-Ins/Components/MINDROLL.component /Applications/MINDROLL.app && killall -9 AudioComponentRegistrar 2>/dev/null; echo "INSTALADO OK"
+
+3) En Ableton: Preferencias > Plug-ins > "Rescan".
+4) En el navegador de Ableton: Plug-ins > Dj Nane > MINDROLL. Ponlo en la pista de la vocal (es un efecto: la vocal pasa tal cual).
+
+Cómo se usa:
+ a) Suelta un one-shot o un trozo de vocal, o pulsa CAPTURE con la canción en marcha: graba el siguiente tiempo de la pista.
+ b) LENGTH (1, 2, 4 u 8 compases) y ROLL (LINEAR, EXPO o LATE): cómo acelera de 1/4 a 1/32.
+ c) GATE START y GATE END: cuánto suena el trozo en cada golpe (crece hasta el drop). PITCH y FILTER suben hasta el drop. REVERSE da la vuelta al último golpe.
+ d) PREVIEW lo escucha (con la canción en marcha entra en el siguiente compás).
+ e) Arrastra la barra de abajo a Ableton y pon el clip justo antes del drop.
