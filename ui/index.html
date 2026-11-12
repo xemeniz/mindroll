@@ -420,6 +420,7 @@ function demoSource(n){SRC={loaded:true,name:(n||'vocal_chop').replace(/\.[^.]+$
 
 paintSettings();paint();
 requestAnimationFrame(fit);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{paintLane();paintSource()});   // la línea se redibuja con Nunito en cuanto carga la fuente
 if(PLUGIN)emit('moReady');
 else{demoPlan();if(location.hash==='#demo'){demoSource();P.pitch=7;P.reverse=1;demoPlan()}}
 
