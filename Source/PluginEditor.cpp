@@ -23,7 +23,7 @@ MOEditor::MOEditor (MOProcessor& p)
     frame = juce::ImageCache::getFromMemory (BinaryData::frame_jpg, BinaryData::frame_jpgSize);
     bar.font = juce::Typeface::createSystemTypefaceFor (BinaryData::NunitoExtraBold_ttf, BinaryData::NunitoExtraBold_ttfSize);
     bar.label = "DRAG THE BUILD TO ABLETON";
-    bar.dropLabel = "DROP TO LOAD THE VOCAL";
+    bar.dropLabel = "DROP TO LOAD THE SOUND";
 
     auto options = juce::WebBrowserComponent::Options{}
         .withNativeIntegrationEnabled()
@@ -41,7 +41,7 @@ MOEditor::MOEditor (MOProcessor& p)
         })
         .withEventListener ("moBrowse", [this] (const juce::var&)
         {
-            chooser = std::make_unique<juce::FileChooser> ("Load a vocal", juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+            chooser = std::make_unique<juce::FileChooser> ("Load a sound", juce::File::getSpecialLocation (juce::File::userMusicDirectory),
                                                            "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg;*.m4a;*.caf");
             chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                   [this] (const juce::FileChooser& fc) { if (fc.getResult().existsAsFile()) loadFile (fc.getResult()); });
@@ -67,7 +67,7 @@ MOEditor::MOEditor (MOProcessor& p)
 
     bar.makeFile = [this]
     {
-        if (! proc.hasBuild()) { toast ("Load or capture a vocal first"); return juce::File(); }
+        if (! proc.hasBuild()) { toast ("Load or capture a sound first"); return juce::File(); }
         auto f = proc.exportBuild();
         if (! f.existsAsFile()) toast ("Could not write the WAV");
         return f;

@@ -98,7 +98,7 @@ int main()
     pump (300);
 
     // cambiar LENGTH re-renderiza (el timer del procesador)
-    p->setParam ("bars", 3);
+    p->setParam ("len", 8);
     pump (400);
     {
         const auto f = p->exportBuild();
@@ -108,6 +108,24 @@ int main()
         CHECK (f.getFileName() == "hey_chop_ROLL_8BAR_124BPM.wav", "nombre del WAV: %s", f.getFileName().toRawUTF8());
     }
 
+    // LENGTH libre: 3 compases
+    {
+        p->setParam ("len", 3); pump (400);
+        const auto f = p->exportBuild();
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> r (fm.createReaderFor (f));
+        CHECK (r != nullptr && std::abs (r->lengthInSamples / SR - 12 * 60.0 / 124.0) < 0.01, "LENGTH 3 no da 3 compases");
+        p->setParam ("len", 8); pump (400);
+    }
+    // recortar el sonido a mano: con un trozo más corto, suena una parte mayor de él
+    {
+        const double useAll = (double) p->planVar().getProperty ("use", 0.0);
+        p->setParam ("send", 0.25f); pump (400);
+        const double useCut = (double) p->planVar().getProperty ("use", 0.0);
+        CHECK (useCut > useAll * 1.5, "el recorte del sonido no cambia la parte que suena (%.2f vs %.2f)", useCut, useAll);
+        CHECK (p->hasBuild(), "con el sonido recortado no hay build");
+    }
+
     // guardar y abrir el proyecto: vuelve la vocal y los ajustes
     {
         juce::MemoryBlock st; p->getStateInformation (st);
@@ -115,7 +133,8 @@ int main()
         q->setStateInformation (st.getData(), (int) st.getSize());
         pump (300);
         CHECK (q->hasSource() && q->hasBuild(), "al abrir el proyecto no vuelve la vocal");
-        CHECK ((int) q->apvts.getRawParameterValue ("bars")->load() == 3, "al abrir el proyecto no vuelve LENGTH");
+        CHECK ((int) q->apvts.getRawParameterValue ("len")->load() == 8, "al abrir el proyecto no vuelve LENGTH");
+        CHECK (std::abs (q->apvts.getRawParameterValue ("send")->load() - 0.25f) < 1e-4f, "al abrir el proyecto no vuelve el recorte del sonido");
         CHECK (q->lineVar().size() == 3 && std::abs ((double) q->lineVar()[2][1] - 0.9) < 1e-3, "al abrir el proyecto no vuelve la línea");
     }
 

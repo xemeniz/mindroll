@@ -18,7 +18,7 @@ namespace mroll
 
     struct Settings
     {
-        int bars = 2;            // 1, 2, 4 u 8 compases (4/4)
+        int bars = 2;            // de 1 a 32 compases (4/4)
         Line line;               // velocidad del roll a lo largo del build (vacía = EXPO)
         float gateStart = 0.35f; // trozo que suena en cada golpe al principio (0-1 del paso)
         float gateEnd = 1.0f;    // ... y al final, justo antes del drop
@@ -49,6 +49,8 @@ namespace mroll
     double totalBeats (const Settings&);
     std::vector<Hit> planHits (const Settings&);
     Source prepareSource (const juce::AudioBuffer<float>& in, double sr, double maxSeconds = 4.0);
+    // El trozo elegido a mano con los tiradores de la onda (a y b de 0 a 1).
+    Source slice (const Source&, float a, float b);
     // Renderiza el build: estéreo, al sample rate y BPM pedidos. Nunca suena más fuerte que el trozo original.
     juce::AudioBuffer<float> render (const Source&, const Settings&, double bpm, double sr);
 }

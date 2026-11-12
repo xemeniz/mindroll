@@ -160,6 +160,17 @@ int main()
         CHECK (rf1 > ro1 * 0.7f, "el filtro no se abre al final (%.3f vs %.3f)", rf1, ro1);
     }
 
+    // Recorte del sonido: el trozo es más corto y nunca más fuerte que su propio pico.
+    {
+        const auto cut = mroll::slice (src, 0.1f, 0.4f);
+        CHECK (std::abs (cut.buf.getNumSamples() - (int) std::round (0.3 * src.buf.getNumSamples())) <= 1, "el recorte no tiene el largo elegido");
+        mroll::Settings s; s.bars = 3; s.pitch = 12; s.filter = 0;
+        const auto out = mroll::render (cut, s, bpm, SR);
+        CHECK (out.getNumSamples() == (int) std::round (12 * SR * 60.0 / bpm), "LENGTH 3 compases no dura 3 compases");
+        CHECK (std::max (out.getMagnitude (0, 0, out.getNumSamples()), out.getMagnitude (1, 0, out.getNumSamples())) <= cut.peak + 1e-4f, "el recorte suena más fuerte que el trozo");
+        CHECK (mroll::slice (src, 0.0f, 1.0f).buf.getNumSamples() == src.buf.getNumSamples(), "sin recorte debería ser el sonido entero");
+    }
+
     // Más BPM = build más corto.
     {
         mroll::Settings s; s.bars = 2;

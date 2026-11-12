@@ -3,14 +3,15 @@
 
 using APVTS = juce::AudioProcessorValueTreeState;
 
-static const juce::StringArray kBars { "1", "2", "4", "8" };
 
 APVTS::ParameterLayout MOProcessor::layout()
 {
     APVTS::ParameterLayout l;
     using PID = juce::ParameterID;
     auto pct = juce::AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return juce::String (juce::roundToInt (v * 100)) + " %"; });
-    l.add (std::make_unique<juce::AudioParameterChoice> (PID { "bars", 1 }, "Length (bars)", kBars, 1));
+    l.add (std::make_unique<juce::AudioParameterInt> (PID { "len", 1 }, "Length (bars)", 1, 32, 2, juce::AudioParameterIntAttributes().withLabel ("bars")));
+    l.add (std::make_unique<juce::AudioParameterFloat> (PID { "sstart", 1 }, "Sound Start", juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, pct));
+    l.add (std::make_unique<juce::AudioParameterFloat> (PID { "send", 1 }, "Sound End", juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f, pct));
     l.add (std::make_unique<juce::AudioParameterFloat> (PID { "gate0", 1 }, "Gate Start", juce::NormalisableRange<float> (0.05f, 1.0f), 0.35f, pct));
     l.add (std::make_unique<juce::AudioParameterFloat> (PID { "gate1", 1 }, "Gate End", juce::NormalisableRange<float> (0.05f, 1.0f), 1.0f, pct));
     l.add (std::make_unique<juce::AudioParameterInt> (PID { "pitch", 1 }, "Pitch Up", 0, 12, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
@@ -25,11 +26,11 @@ MOProcessor::MOProcessor()
                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "MINDROLL", layout())
 {
-    pBars = apvts.getRawParameterValue ("bars");
+    pBars = apvts.getRawParameterValue ("len"); pS0 = apvts.getRawParameterValue ("sstart"); pS1 = apvts.getRawParameterValue ("send");
     pG0 = apvts.getRawParameterValue ("gate0");    pG1 = apvts.getRawParameterValue ("gate1");
     pPitch = apvts.getRawParameterValue ("pitch"); pFilter = apvts.getRawParameterValue ("filter");
     pRev = apvts.getRawParameterValue ("reverse"); pSbpm = apvts.getRawParameterValue ("sbpm");
-    for (auto id : { "bars", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.addParameterListener (id, this);
+    for (auto id : { "len", "sstart", "send", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.addParameterListener (id, this);
     loadGlobal();
     startTimerHz (10);
 }
@@ -38,7 +39,7 @@ MOProcessor::~MOProcessor()
 {
     stopTimer();
     cancelPendingUpdate();
-    for (auto id : { "bars", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.removeParameterListener (id, this);
+    for (auto id : { "len", "sstart", "send", "gate0", "gate1", "pitch", "filter", "reverse", "sbpm" }) apvts.removeParameterListener (id, this);
 }
 
 // ------------------------------------------------------------------ ajustes globales (tema)
@@ -160,8 +161,7 @@ void MOProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuff
 mroll::Settings MOProcessor::settings() const
 {
     mroll::Settings s;
-    static const int bars[] { 1, 2, 4, 8 };
-    s.bars = bars[juce::jlimit (0, 3, (int) pBars->load())];
+    s.bars = juce::jlimit (1, 32, (int) std::round (pBars->load()));
     s.line = line;
     s.gateStart = pG0->load(); s.gateEnd = pG1->load();
     s.pitch = std::round (pPitch->load());
@@ -189,7 +189,7 @@ void MOProcessor::rerender()
     }
     Build::Ptr b = new Build();
     b->bpm = currentBpm(); b->sr = sampleRateNow;
-    b->buf = mroll::render (source, settings(), b->bpm, b->sr);
+    b->buf = mroll::render (mroll::slice (source, pS0->load(), pS1->load()), settings(), b->bpm, b->sr);
     if (build != nullptr) retired.push_back (build);
     build = b;
     active = b.get();
@@ -202,9 +202,9 @@ void MOProcessor::handleAsyncUpdate()
     juce::AudioBuffer<float> cap (2, capWritten);
     for (int ch = 0; ch < 2; ++ch) cap.copyFrom (ch, 0, capBuf, ch, 0, capWritten);
     capState = 0;
-    if (! setSourceFromBuffer (cap, getSampleRate(), "Captured vocal"))
+    if (! setSourceFromBuffer (cap, getSampleRate(), "Captured sound"))
     {
-        if (onToast) onToast ("Nothing came in from the track. Play the vocal and try again");
+        if (onToast) onToast ("Nothing came in from the track. Play the song and try again");
         if (onSourceChanged) onSourceChanged();
         return;
     }
@@ -273,7 +273,7 @@ void MOProcessor::toggleCapture()
 void MOProcessor::togglePlay()
 {
     if (prevState.load() == 1) { prevState = 2; return; }
-    if (build == nullptr) { if (onToast) onToast (source.valid() ? "Rendering, try again" : "Load or capture a vocal first"); return; }
+    if (build == nullptr) { if (onToast) onToast (source.valid() ? "Rendering, try again" : "Load or capture a sound first"); return; }
     if (prevState.load() == 0) prevPos = 0;
     prevState = 1;
 }
@@ -304,7 +304,7 @@ juce::File MOProcessor::exportBuild()
 {
     if (build == nullptr) return {};
     const auto s = settings();
-    auto base = sourceName.isNotEmpty() ? sourceName : juce::String ("vocal");
+    auto base = sourceName.isNotEmpty() ? sourceName : juce::String ("sound");
     auto dir = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("MINDROLL").getChildFile ("Drag");
     dir.createDirectory();
     auto f = dir.getChildFile (juce::File::createLegalFileName (base + "_ROLL_" + juce::String (s.bars) + "BAR_"
@@ -374,7 +374,11 @@ juce::var MOProcessor::planVar() const
     o->setProperty ("hits", hs);
     o->setProperty ("line", lineVar());
     // parte del trozo que llega a sonar (el golpe más largo)
-    if (source.valid()) o->setProperty ("use", juce::jmin (1.0, longest * 60.0 / currentBpm() / (source.buf.getNumSamples() / source.sr)));
+    if (source.valid())
+    {
+        const double region = juce::jmax (0.001, std::abs ((double) pS1->load() - (double) pS0->load())) * source.buf.getNumSamples() / source.sr;
+        o->setProperty ("use", juce::jmin (1.0, longest * 60.0 / currentBpm() / region));   // parte del trozo elegido que llega a sonar
+    }
     return juce::var (o);
 }
 

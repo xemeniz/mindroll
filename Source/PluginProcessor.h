@@ -111,7 +111,7 @@ private:
     std::atomic<int> prevPos { 0 };
     Build* playing = nullptr;
 
-    std::atomic<float>* pBars = nullptr;
+    std::atomic<float>* pBars = nullptr; std::atomic<float>* pS0 = nullptr; std::atomic<float>* pS1 = nullptr;
     std::atomic<float>* pG0 = nullptr; std::atomic<float>* pG1 = nullptr;
     std::atomic<float>* pPitch = nullptr; std::atomic<float>* pFilter = nullptr;
     std::atomic<float>* pRev = nullptr; std::atomic<float>* pSbpm = nullptr;

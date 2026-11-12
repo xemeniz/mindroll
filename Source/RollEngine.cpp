@@ -5,8 +5,7 @@ namespace mroll
 {
 double totalBeats (const Settings& s)
 {
-    const int b = (s.bars == 1 || s.bars == 2 || s.bars == 4 || s.bars == 8) ? s.bars : 2;
-    return 4.0 * b;
+    return 4.0 * juce::jlimit (1, 32, s.bars);
 }
 
 Line shapeLine (int shape)
@@ -123,6 +122,25 @@ Source prepareSource (const juce::AudioBuffer<float>& in, double sr, double maxS
     for (int ch = 0; ch < 2; ++ch)
         s.buf.copyFrom (ch, 0, in, std::min (ch, chs - 1), first, len);
     s.peak = std::max (s.buf.getMagnitude (0, 0, len), s.buf.getMagnitude (1, 0, len));
+    return s;
+}
+
+Source slice (const Source& src, float a, float b)
+{
+    if (! src.valid()) return src;
+    const int n = src.buf.getNumSamples();
+    a = juce::jlimit (0.0f, 1.0f, a); b = juce::jlimit (0.0f, 1.0f, b);
+    if (b < a) std::swap (a, b);
+    if (a <= 0.0f && b >= 1.0f) return src;
+    const int i0 = juce::jlimit (0, n - 1, (int) std::round (a * n));
+    const int len = juce::jlimit (1, n - i0, juce::jmax ((int) (src.sr * 0.005), (int) std::round ((b - a) * n)));
+    Source s; s.sr = src.sr;
+    s.buf.setSize (2, len);
+    for (int ch = 0; ch < 2; ++ch) s.buf.copyFrom (ch, 0, src.buf, ch, i0, len);
+    // si el corte empieza a mitad de onda, una entrada de 1 ms para que no haga clic
+    const int fade = juce::jmin (len / 4, (int) (src.sr * 0.001));
+    for (int ch = 0; ch < 2; ++ch) s.buf.applyGainRamp (ch, 0, fade, 0.0f, 1.0f);
+    s.peak = juce::jmax (s.buf.getMagnitude (0, 0, len), s.buf.getMagnitude (1, 0, len));
     return s;
 }
 

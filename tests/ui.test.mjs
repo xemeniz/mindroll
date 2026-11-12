@@ -23,12 +23,13 @@ ok((await sent()).some(([e]) => e === 'moReady'), 'avisa al plugin al arrancar (
 await fire('moSettings', { theme: 'dark', standalone: false });
 
 // sin vocal
-ok(await page.isVisible('#empty'), 'sin vocal enseña "DROP A VOCAL HERE"');
+ok(await page.isVisible('#empty') && (await page.textContent('#empty b')) === 'DROP A SOUND HERE', 'sin sonido enseña "DROP A SOUND HERE"');
+ok((await page.textContent('.srcp .ptitle')).startsWith('Sound'), 'el panel se llama SOUND');
 ok(await page.isDisabled('#play') && await page.isDisabled('#stop'), 'PLAY y STOP apagados sin vocal');
 ok(await page.isDisabled('#clear'), 'CLEAR apagado sin vocal');
 
 // estado y plan desde el plugin (plan real de 2 compases EXPO)
-const params = { bars: 1, gate0: 0.35, gate1: 1, pitch: 5, filter: 0.5, reverse: false, sbpm: 124 };
+const params = { len: 2, sstart: 0, send: 1, gate0: 0.35, gate1: 1, pitch: 5, filter: 0.5, reverse: false, sbpm: 124 };
 await fire('moState', { p: params, cap: 0, prev: 0, pos: 0, bpm: 126 });
 const line = [[0, 0.2], [0.55, 0.36], [1, 0.85]];
 const hits = []; { let t = 0; while (t < 8) { const r = 0.5 * Math.pow(32, 0.2 + 0.65 * t / 8); const len = Math.min(1 / r, 8 - t); hits.push([t, len, 0.35 + 0.65 * t / 8, 5 * (t / 8) ** 2, 0, r]); t += len; } }
@@ -62,8 +63,15 @@ for (const sel of ['.btns3 button', '#bars button', '#shape button', '.row.end b
 await clear();
 await page.click('#bars button:nth-child(4)');
 let s = await sent();
-ok(s.some(([e, o]) => e === 'moSet' && o.id === 'bars' && o.v === 3), 'LENGTH 8 manda bars=3');
-ok(s.some(([e, o]) => e === 'moGesture' && o.id === 'bars' && o.begin), 'LENGTH abre el gesto (automatización)');
+ok(s.some(([e, o]) => e === 'moSet' && o.id === 'len' && o.v === 8), 'LENGTH 8 manda len=8');
+ok(s.some(([e, o]) => e === 'moGesture' && o.id === 'len' && o.begin), 'LENGTH abre el gesto (automatización)');
+ok((await page.textContent('#lent')) === '8', 'la caja de LENGTH enseña 8');
+await clear();
+const lv = await page.locator('#lenv').boundingBox();
+await page.mouse.move(lv.x + lv.width / 2, lv.y + lv.height / 2); await page.mouse.wheel(0, -100); await page.mouse.wheel(0, -100);
+const lvs = (await sent()).filter(([e, o]) => e === 'moSet' && o.id === 'len').pop();
+ok(lvs && lvs[1].v === 10, 'LENGTH libre: con la rueda pasa a 10 compases (' + (lvs && lvs[1].v) + ')');
+ok((await page.locator('#bars button.on').count()) === 0, 'con 10 compases no se marca ningún atajo');
 // SHAPE: LATE manda su línea
 await clear();
 await page.click('#shape button:nth-child(3)');
@@ -124,6 +132,37 @@ await clear();
 await page.keyboard.press('Control+z');
 ok((await sent()).some(([e, o]) => e === 'moSet' && o.id === 'reverse' && o.v === 0), 'Cmd+Z deshace REVERSE');
 
+// tiradores de la onda: elegir la parte del sonido
+{
+  const wb = await page.locator('#wcv').boundingBox();
+  const cw = await page.evaluate(() => document.querySelector('#wcv').clientWidth);
+  const fx = f => wb.x + (8 + (cw - 16) * f) * wb.width / cw;
+  await clear();
+  await page.mouse.move(fx(1), wb.y + wb.height / 2); await page.mouse.down(); await page.mouse.move(fx(0.5), wb.y + wb.height / 2, { steps: 6 }); await page.mouse.up();
+  let ev = (await sent()).filter(([e, o]) => e === 'moSet' && o.id === 'send').pop();
+  ok(ev && Math.abs(ev[1].v - 0.5) < 0.02, 'arrastrar el tirador derecho acorta el sonido (' + (ev && ev[1].v) + ')');
+  await clear();
+  await page.mouse.move(fx(0), wb.y + wb.height / 2); await page.mouse.down(); await page.mouse.move(fx(0.2), wb.y + wb.height / 2, { steps: 6 }); await page.mouse.up();
+  ev = (await sent()).filter(([e, o]) => e === 'moSet' && o.id === 'sstart').pop();
+  ok(ev && Math.abs(ev[1].v - 0.2) < 0.02, 'arrastrar el tirador izquierdo mueve el inicio (' + (ev && ev[1].v) + ')');
+  await clear();
+  await page.mouse.move(fx(0.35), wb.y + wb.height / 2); await page.mouse.down(); await page.mouse.move(fx(0.45), wb.y + wb.height / 2, { steps: 6 }); await page.mouse.up();
+  const s1 = (await sent()).filter(([e, o]) => e === 'moSet' && o.id === 'sstart').pop(), e1 = (await sent()).filter(([e, o]) => e === 'moSet' && o.id === 'send').pop();
+  ok(s1 && e1 && Math.abs(s1[1].v - 0.3) < 0.02 && Math.abs(e1[1].v - 0.6) < 0.02, 'arrastrar por el medio mueve el trozo entero (' + (s1 && s1[1].v) + ' a ' + (e1 && e1[1].v) + ')');
+  await page.screenshot({ path: out + '-trim.png' });
+  await clear();
+  await page.mouse.dblclick(fx(0.45), wb.y + wb.height / 2);
+  s = await sent();
+  ok(s.some(([e, o]) => e === 'moSet' && o.id === 'sstart' && o.v === 0) && s.some(([e, o]) => e === 'moSet' && o.id === 'send' && o.v === 1), 'doble clic en la onda vuelve al sonido entero');
+}
+
+// espacio = PLAY/PAUSE (también después de haber pulsado un botón)
+await page.click('#rev'); await page.click('#rev');
+await clear();
+await page.keyboard.press('Space');
+s = (await sent()).map(([e]) => e);
+ok(s.filter(e => e === 'moPlay').length === 1 && !s.includes('moSet'), 'la barra espaciadora hace PLAY sin volver a pulsar el último botón');
+
 // botones del trozo y transporte
 await clear();
 await page.click('#cap'); await page.click('#play'); await page.click('#load'); await page.click('#clear');
@@ -164,7 +203,7 @@ await fire('moSettings', { standalone: false });
 // settings y tema claro
 await page.click('#gear');
 ok(await page.isVisible('#modal.show'), 'Settings se abre');
-ok((await page.textContent('#ver')) === '0.2.0', 'Settings enseña la versión');
+ok((await page.textContent('#ver')) === '0.3.0', 'Settings enseña la versión');
 await clear();
 await page.click('#theme button:nth-child(2)');
 ok((await sent()).some(([e, o]) => e === 'moSettings' && o.theme === 'light'), 'el tema claro se guarda en el plugin');

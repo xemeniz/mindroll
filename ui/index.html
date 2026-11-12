@@ -39,6 +39,7 @@ header{position:relative;display:flex;align-items:center;justify-content:space-b
 .val{width:112px;height:34px;border-radius:10px;background:var(--btn);color:var(--btnt);display:flex;align-items:center;justify-content:center;font-weight:900;box-shadow:0 1px 2px rgba(0,0,0,.18);font-variant-numeric:tabular-nums;letter-spacing:.03em;touch-action:none;flex:none}
 .val.drag{cursor:ns-resize}
 .val small{font-size:9px;letter-spacing:.14em;margin-right:6px;opacity:.6;font-weight:900}
+.val.lenv{width:92px;cursor:ns-resize}.val.lenv small{margin:0 0 0 6px}
 .hint{font-size:11px;color:var(--mu);font-weight:700;letter-spacing:.02em}
 /* paneles */
 .main{display:flex;gap:10px;margin-bottom:10px}
@@ -50,7 +51,8 @@ header{position:relative;display:flex;align-items:center;justify-content:space-b
 /* source */
 .srcp{width:340px;flex:none;display:flex;flex-direction:column}
 .wave{position:relative;height:178px;border-radius:12px;background:var(--cell);overflow:hidden}
-.wave canvas{position:absolute;inset:0;width:100%;height:100%}
+.wave canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.wave canvas.ew{cursor:ew-resize}.wave canvas.mv{cursor:grab}
 .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;pointer-events:none}
 .empty b{font-weight:900;font-size:13px;letter-spacing:.14em}
 .wave.over{box-shadow:inset 0 0 0 2px var(--h2)}
@@ -153,20 +155,20 @@ body::after{border-bottom:0}
 
 <div class="main">
  <div class="panel srcp">
-  <div class="ptitle">Vocal<div class="sp"></div><span class="chip" id="sname" style="display:none"></span></div>
-  <div class="wave" id="wave" data-tip="The vocal slice. The light part is what the build plays. Drop a file here"><canvas id="wcv"></canvas>
-   <div class="empty" id="empty"><b>DROP A VOCAL HERE</b><span class="hint">or capture it from the track</span></div></div>
+  <div class="ptitle">Sound<div class="sp"></div><span class="chip" id="sname" style="display:none"></span></div>
+  <div class="wave" id="wave" data-tip="Your sound. Drag the two handles to choose the part that plays (closer = shorter), drag in the middle to move it, double-click to use it all. Drop a file here"><canvas id="wcv"></canvas>
+   <div class="empty" id="empty"><b>DROP A SOUND HERE</b><span class="hint">or capture it from the track</span></div></div>
   <div class="btns3">
-   <button id="load" data-tip="Load a one-shot or a slice of vocal">LOAD</button>
-   <button class="cap" id="cap" data-tip="CAPTURE: records the next beat of this track (with the song playing). Stopped: it starts as soon as the vocal sounds">CAPTURE</button>
-   <button id="clear" data-tip="Remove the vocal">CLEAR</button>
+   <button id="load" data-tip="Load a sound: a one-shot, a vocal, anything">LOAD</button>
+   <button class="cap" id="cap" data-tip="CAPTURE: grabs a sound from the track the plugin is on. Press it, play the song and it records the next beat">CAPTURE</button>
+   <button id="clear" data-tip="Remove the sound">CLEAR</button>
   </div>
-  <div class="hint" id="shint">Silence at the start is trimmed automatically.</div>
+  <div class="hint" id="shint">Drag the handles to choose the part that plays.</div>
  </div>
  <div class="panel bldp">
   <div class="ptitle">Build<div class="sp"></div><span class="chip" id="binfo">2 BARS</span></div>
   <div class="row">
-   <span class="lbl">LENGTH</span><div class="seg" id="bars"></div><span class="lbl">BARS</span>
+   <span class="lbl">LENGTH</span><div class="seg" id="bars"></div><div class="val lenv" id="lenv" data-tip="Any length from 1 to 32 bars: drag up and down or use the wheel. Double-click = 2"><span id="lent">2</span><small>BARS</small></div>
    <div class="vsep"></div>
    <span class="lbl">SHAPE</span><div class="seg wide" id="shape"></div>
   </div>
@@ -189,11 +191,11 @@ body::after{border-bottom:0}
  <h3>APPEARANCE</h3>
  <div class="seti"><div class="seg" id="theme"></div></div>
  <h3>HOW TO USE</h3>
- <div class="info"><b>1. Put it on the vocal track</b><br><span>The vocal goes through untouched.</span><br>
-  <b>2. Get the slice</b><br><span>Drop a one-shot or a vocal slice, or press CAPTURE with the song playing: it records the next beat of the track.</span><br>
+ <div class="info"><b>1. Put it on a track</b><br><span>Usually the vocal. The track goes through untouched.</span><br>
+  <b>2. Get the sound</b><br><span>Drop a one-shot or a vocal slice, or press CAPTURE and play the song: it records the next beat of the track. Drag the two handles on the waveform to choose the part that plays.</span><br>
   <b>3. Draw the speed</b><br><span>The line sets how fast the slice repeats, from 1/2 up to 1/64. It is not locked to the grid: the roll drifts off the beat as it speeds up. Drag the points, click the line to add one, double-click to remove it. LINEAR, EXPO and LATE are starting shapes.</span><br>
-  <b>4. Shape the sound</b><br><span>LENGTH in bars. GATE START and END set how much of the slice plays on each hit. PITCH and FILTER rise to the drop. REVERSE turns the last hit around.</span><br>
-  <b>5. Listen and drag</b><br><span>PLAY / PAUSE and STOP. Drag the bar at the bottom into Ableton and put the clip right before the drop.</span></div>
+  <b>4. Shape the sound</b><br><span>LENGTH from 1 to 32 bars. GATE START and END set how much of the slice plays on each hit. PITCH and FILTER rise to the drop. REVERSE turns the last hit around.</span><br>
+  <b>5. Listen and drag</b><br><span>PLAY / PAUSE (or the space bar) and STOP. Drag the bar at the bottom into Ableton and put the clip right before the drop.</span></div>
  <h3>INFO</h3>
  <div class="info">MINDROLL<br><span>Series</span> Mind Series<br><span>Version</span> <b id="ver"></b><br><span>Created by</span> Dj Nan&#233;</div>
 </div></div>
@@ -202,7 +204,7 @@ body::after{border-bottom:0}
 
 <script>
 "use strict";
-const VERSION='0.2.0';
+const VERSION='0.3.0';
 const BARS=[1,2,4,8];
 // Formas de partida de la línea (mismas que en el plugin): [x 0..1, y 0..1]. y: 0 = 1/2 ... 1 = 1/64
 const SHAPES=[['LINEAR',[[0,.2],[1,.8]],'Steady acceleration from 1/4 to 1/32'],
@@ -219,12 +221,12 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let toastT=null;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600)}
 
 // ================= estado (el plugin manda; aquí hay una copia) =================
-const P={bars:1,gate0:.35,gate1:1,pitch:0,filter:.5,reverse:0,sbpm:124};
+const P={len:2,sstart:0,send:1,gate0:.35,gate1:1,pitch:0,filter:.5,reverse:0,sbpm:124};
 let LINE=SHAPES[1][1].map(p=>p.slice());
 let SRC={loaded:false}, PLAN={total:8,hits:[]}, settings={theme:'dark',standalone:false};
 let cap=0, play=0, pos=0, bpm=124, dragging=null, lineDrag=false, Z=1;
 
-function set(id,v){P[id]=v;emit('moSet',{id,v});if(!PLUGIN)demoPlan()}
+function set(id,v){P[id]=v;emit('moSet',{id,v});if(!PLUGIN&&id!=='sstart'&&id!=='send')demoPlan()}
 function gesture(id,begin){emit('moGesture',{id,begin})}
 function setG(id,v){gesture(id,true);set(id,v);gesture(id,false)}
 function sendLine(){emit('moLine',{pts:LINE.map(p=>[+p[0].toFixed(4),+p[1].toFixed(4)])});if(!PLUGIN)demoPlan()}
@@ -237,7 +239,10 @@ function restore(s){const o=JSON.parse(s);for(const k in o.P)if(o.P[k]!==P[k])se
 function undo(){if(!undoS.length){toast('Nothing to undo');return}redoS.push(snap());restore(undoS.pop())}
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop())}
 $('#undo').onclick=undo;
-document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}});
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+ if((e.code==='Space'||e.key===' ')&&!e.repeat&&!e.metaKey&&!e.ctrlKey&&!e.altKey){e.preventDefault();if(SRC.loaded)$('#play').click()}});
+// que un botón pulsado no se quede con el foco (si no, el espacio lo volvería a pulsar)
+document.addEventListener('mouseup',()=>{const a=document.activeElement;if(a&&a.tagName==='BUTTON')a.blur()});
 
 // ================= arrastres =================
 function dragVal(elm,id,opt){
@@ -250,6 +255,7 @@ function dragVal(elm,id,opt){
  elm.addEventListener('wheel',e=>{if(opt.ok&&!opt.ok())return;e.preventDefault();pushUndo();const v=opt.snap(clamp(P[id]+(e.deltaY<0?opt.wheel:-opt.wheel),opt.min,opt.max));setG(id,v);paint()},{passive:false});
 }
 const r2=v=>Math.round(v*100)/100;
+dragVal($('#lenv'),'len',{min:1,max:32,px:260,def:2,snap:v=>Math.round(v),wheel:1});
 dragVal($('#bpmv'),'sbpm',{min:60,max:200,px:400,def:124,snap:v=>Math.round(v),wheel:1,ok:()=>settings.standalone});
 
 // ================= knobs =================
@@ -299,15 +305,38 @@ function paintSource(){
  const n=$('#sname');n.style.display=SRC.loaded?'inline-flex':'none';n.textContent=SRC.loaded?SRC.name:'';
  $('#clear').disabled=!SRC.loaded;
  const {c,w,h,px}=canvas($('#wcv'));if(!SRC.loaded||!SRC.wave)return;
- const W=SRC.wave,use=clamp(PLAN.use==null?1:PLAN.use,0,1),mid=h/2,bw=(w-16)/W.length;
+ const W=SRC.wave,mid=h/2,X0=8,WW=w-16,bw=WW/W.length,a=Math.min(P.sstart,P.send),b=Math.max(P.sstart,P.send);
+ const use=clamp(PLAN.use==null?1:PLAN.use,0,1),ue=a+(b-a)*use;
+ // fuera del trozo elegido: apagado
+ c.fillStyle=css('--grid');c.fillRect(X0,6,WW*a,h-12);c.fillRect(X0+WW*b,6,WW*(1-b),h-12);
  c.fillStyle=css('--wave');
- for(let i=0;i<W.length;i++){const x=8+i*bw,a=Math.max(px,W[i]*(h*.4));c.globalAlpha=(i+.5)/W.length<=use?1:.28;c.fillRect(snapPx(x,px),snapPx(mid-a,px),Math.max(px,snapPx(bw*.6,px)),snapPx(a*2,px))}
+ for(let i=0;i<W.length;i++){const f=(i+.5)/W.length,x=X0+i*bw,amp=Math.max(px,W[i]*(h*.4));
+  c.globalAlpha=f<a||f>b?.18:f<=ue?1:.45;c.fillRect(snapPx(x,px),snapPx(mid-amp,px),Math.max(px,snapPx(bw*.6,px)),snapPx(amp*2,px))}
  c.globalAlpha=1;
- if(use<1){c.fillStyle=css('--grid2');c.fillRect(snapPx(8+use*(w-16),px),8,1,h-16)}
+ // tiradores
+ [a,b].forEach((v,i)=>{const x=snapPx(X0+WW*v,px),hx=i?x-12:x;c.fillStyle=css('--w');c.fillRect(x-1,6,2,h-12);
+  c.beginPath();c.moveTo(hx+4,6);c.lineTo(hx+8,6);c.quadraticCurveTo(hx+12,6,hx+12,10);c.lineTo(hx+12,18);c.quadraticCurveTo(hx+12,22,hx+8,22);c.lineTo(hx+4,22);c.quadraticCurveTo(hx,22,hx,18);c.lineTo(hx,10);c.quadraticCurveTo(hx,6,hx+4,6);
+  c.fillStyle=css('--h1');c.fill();c.lineWidth=1.5;c.strokeStyle='#000';c.stroke()});
 }
+// tiradores de la onda: elegir a mano qué parte del sonido suena
+(function(){const cv=$('#wcv');let mode=null,x0=0,a0=0,b0=0;
+ const pos=e=>{const r=cv.getBoundingClientRect();return clamp(((e.clientX-r.left)/r.width*cv.clientWidth-8)/(cv.clientWidth-16),0,1)};
+ const near=e=>{if(!SRC.loaded)return null;const f=pos(e),tol=10/(cv.clientWidth-16);
+  if(Math.abs(f-P.sstart)<tol)return 'a';if(Math.abs(f-P.send)<tol)return 'b';if(f>P.sstart&&f<P.send)return 'm';return null};
+ cv.addEventListener('pointermove',e=>{if(!mode){const m=near(e);cv.classList.toggle('ew',m==='a'||m==='b');cv.classList.toggle('mv',m==='m');return}
+  const f=pos(e),gap=.02;
+  if(mode==='a')set('sstart',+clamp(f,0,P.send-gap).toFixed(3));
+  else if(mode==='b')set('send',+clamp(f,P.sstart+gap,1).toFixed(3));
+  else{const d=clamp(f-x0,-a0,1-b0);set('sstart',+(a0+d).toFixed(3));set('send',+(b0+d).toFixed(3))}
+  paintSource()});
+ cv.addEventListener('pointerdown',e=>{const m=near(e);if(!m)return;mode=m;x0=pos(e);a0=P.sstart;b0=P.send;pushUndo();gesture('sstart',true);gesture('send',true);dragging=m==='b'?'send':'sstart';cv.setPointerCapture(e.pointerId)});
+ const up=()=>{if(!mode)return;mode=null;dragging=null;gesture('sstart',false);gesture('send',false)};
+ cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+ cv.addEventListener('dblclick',()=>{if(!SRC.loaded)return;pushUndo();setG('sstart',0);setG('send',1);paintSource()});
+})();
 
 // geometría de la línea: área de la curva arriba, golpes en la franja de abajo
-function geo(w,h){const T=PLAN.total||4*BARS[P.bars],rv=(PLAN.hits||[]).find(x=>x[4]),end=rv?rv[0]:T;
+function geo(w,h){const T=PLAN.total||4*P.len,rv=(PLAN.hits||[]).find(x=>x[4]),end=rv?rv[0]:T;
  const L=34,R=10,top=12,cb=h-46,hs=h-36,he=h-8,W=w-L-R;
  return {T,end,L,R,top,cb,hs,he,W,X:b=>L+W*b/T,LX:x=>L+W*x*end/T,LY:y=>top+(cb-top)*(1-y)}}
 const hitCol=r=>r<=1.05?css('--h0'):r<=2.1?css('--h1'):r<=4.2?css('--h2'):css('--h3');
@@ -328,7 +357,7 @@ function paintLane(){
  // la línea
  c.strokeStyle=css('--w');c.lineWidth=2;c.lineJoin='round';c.beginPath();LINE.forEach(([x,y],i)=>{const X=g.LX(x),Y=g.LY(y);i?c.lineTo(X,Y):c.moveTo(X,Y)});c.stroke();
  LINE.forEach(([x,y],i)=>{c.beginPath();c.arc(g.LX(x),g.LY(y),i===hover?6.5:5,0,Math.PI*2);c.fillStyle=css('--h1');c.fill();c.lineWidth=2;c.strokeStyle='#000';c.stroke()});
- if(!SRC.loaded){c.fillStyle=css('--mu');c.textAlign='center';c.font='800 11px Nunito';c.fillText('LOAD OR CAPTURE A VOCAL',g.L+g.W/2,(g.hs+g.he)/2)}
+ if(!SRC.loaded){c.fillStyle=css('--mu');c.textAlign='center';c.font='800 11px Nunito';c.fillText('LOAD OR CAPTURE A SOUND',g.L+g.W/2,(g.hs+g.he)/2)}
  // cabezal
  if(play){const x=snapPx(g.X(pos*g.T),px);c.fillStyle=css('--w');c.fillRect(x,g.top-4,2,g.he-g.top+4)}
 }
@@ -358,17 +387,18 @@ lcv.addEventListener('dblclick',e=>{const [lx,ly,w,h]=lanePos(e),i=nearest(lx,ly
 
 function paintShape(){seg('#shape',SHAPES.map((s,i)=>[i,s[0],s[2]]),shapeIdx,v=>{pushUndo();LINE=SHAPES[v][1].map(p=>p.slice());sendLine();paint()})}
 function paintCap(){const b=$('#cap');b.classList.toggle('wait',cap===1);b.classList.toggle('rec',cap===2);b.textContent=cap===1?'WAITING':cap===2?'RECORDING':'CAPTURE';
- $('#shint').textContent=cap===1?'Waiting for the next beat (or for the vocal to sound). Press again to cancel.':cap===2?'Recording one beat of the track...':'Silence at the start is trimmed automatically.'}
+ $('#shint').textContent=cap===1?'Play the song: it records the next beat of this track. Press again to cancel.':cap===2?'Recording one beat of the track...':'Drag the handles to choose the part that plays.'}
 function paintPlay(){const b=$('#play');b.classList.toggle('on',play===1);b.querySelector('span').textContent=play===1?'PAUSE':'PLAY';
  b.querySelector('svg').innerHTML=play===1?'<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>':'<path d="M7 4.5v15l12-7.5z"/>';
  b.disabled=!SRC.loaded;$('#stop').disabled=!SRC.loaded||play===0}
 
 function paint(){
- seg('#bars',BARS.map((b,i)=>[i,String(b)]),()=>P.bars,v=>{pushUndo();setG('bars',v);paint()});
+ seg('#bars',BARS.map(b=>[b,String(b)]),()=>P.len,v=>{pushUndo();setG('len',v);paint()});
+ $('#lent').textContent=P.len;
  paintShape();
  kns.forEach(({k,dial,kv})=>{const p=(P[k.id]-k.min)/(k.max-k.min);dial.style.setProperty('--p',p);dial.style.setProperty('--a',(-135+270*p)+'deg');kv.textContent=k.fmt(P[k.id])});
  $('#rev').classList.toggle('on',!!P.reverse);
- const b=BARS[P.bars]||2,nh=(PLAN.hits||[]).length;
+ const b=P.len,nh=(PLAN.hits||[]).length;
  $('#binfo').textContent=b+(b>1?' BARS':' BAR')+(nh&&SRC.loaded?' · '+nh+' HITS':'');
  const bp=settings.standalone?P.sbpm:bpm;$('#bpmt').textContent=Math.round(bp);
  $('#bpmv').classList.toggle('drag',!!settings.standalone);$('#bpmh').textContent=settings.standalone?'drag to change':'from Ableton';
@@ -398,8 +428,8 @@ if(window.matchMedia)matchMedia('(resolution: 2dppx)').addEventListener&&matchMe
 // ================= puente con el plugin =================
 on('moSettings',v=>{if(!v)return;Object.assign(settings,v);paintSettings();paint()});
 on('moState',v=>{if(!v)return;
- if(v.p){for(const k in v.p){if(k===dragging)continue;const x=v.p[k];P[k]=typeof x==='boolean'?+x:x}
-  ['bars','pitch'].forEach(k=>P[k]=Math.round(P[k]));P.reverse=P.reverse>.5?1:0;paint()}
+ if(v.p){for(const k in v.p){if(k===dragging||(dragging==='sstart'&&k==='send'))continue;const x=v.p[k];P[k]=typeof x==='boolean'?+x:x}
+  ['len','pitch'].forEach(k=>P[k]=Math.round(P[k]));P.reverse=P.reverse>.5?1:0;paint()}
  let ch=false;
  if('cap' in v&&v.cap!==cap){cap=v.cap;ch=true}
  if('prev' in v&&v.prev!==play){play=v.prev;ch=true}
@@ -412,10 +442,10 @@ on('moToast',v=>{if(v&&v.msg)toast(v.msg)});
 
 // ================= modo navegador (sin plugin): mismo cálculo que el plugin para ver la interfaz =================
 function lineY(x){if(x<=LINE[0][0])return LINE[0][1];for(let i=1;i<LINE.length;i++)if(x<=LINE[i][0]){const [x0,y0]=LINE[i-1],[x1,y1]=LINE[i];return y0+(y1-y0)*(x1>x0?(x-x0)/(x1-x0):1)}return LINE[LINE.length-1][1]}
-function demoPlan(){if(PLUGIN)return;const T=4*BARS[P.bars],rl=P.reverse?(T>=16?1:.5):0,E=T-rl,hpb=y=>.5*Math.pow(32,y);
+function demoPlan(){if(PLUGIN)return;const T=4*P.len,rl=P.reverse?(T>=16?1:.5):0,E=T-rl,hpb=y=>.5*Math.pow(32,y);
  const st=[0];let ph=0;const dt=1/256;for(let t=0;t<E-1e-9;t+=dt){const r=hpb(lineY((t+dt/2)/E)),n=ph+r*dt;if(n>=1){const at=t+dt*(1-ph)/(r*dt);if(at<E-1e-6)st.push(at);ph=n-1}else ph=n}
  const hs=st.map((b,i)=>{const p=b/T;return [b,(i+1<st.length?st[i+1]:E)-b,P.gate0+(P.gate1-P.gate0)*p,P.pitch*p*p,0,hpb(lineY(b/E))]});
- if(rl)hs.push([E,rl,1,P.pitch,1,8]);PLAN={total:T,hits:hs,use:.6};paint()}
+ if(rl)hs.push([E,rl,1,P.pitch,1,8]);PLAN={total:T,hits:hs,use:Math.min(1,.6/Math.max(.05,P.send-P.sstart))};paintSource();paint()}
 function demoSource(n){SRC={loaded:true,name:(n||'vocal_chop').replace(/\.[^.]+$/,''),dur:.8,wave:Array.from({length:240},(_,i)=>{const t=i/240;return Math.min(1,t*40)*Math.exp(-t*2.2)*(.55+.45*Math.abs(Math.sin(i*.9)))})};paintSource();paint()}
 
 paintSettings();paint();
